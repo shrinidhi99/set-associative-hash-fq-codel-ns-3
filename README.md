@@ -1,2 +1,1 @@
-# CO300-network-assignment
-Computer networks assignment
+# Computer networks assignment
