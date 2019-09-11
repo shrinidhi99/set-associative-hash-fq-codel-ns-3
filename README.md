@@ -12,6 +12,7 @@ set-associative hash in the ns-3 implementation of FQ-CoDel.
 **Bonus experience**: Knowledge of FQ and CoDel is a plus.
 
 **Difficulty**: High
+
 ---
 **Recommended reading**:
 * (RFC 8290) The Flow Queue CoDel Packet Scheduler and Active Queue Management Algorithm (Link: [https://tools.ietf.org/html/rfc8290](https://tools.ietf.org/html/rfc8290))
