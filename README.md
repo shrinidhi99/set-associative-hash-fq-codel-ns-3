@@ -12,7 +12,9 @@ set-associative hash in the ns-3 implementation of FQ-CoDel.
 **Bonus experience**: Knowledge of FQ and CoDel is a plus.
 
 **Difficulty**: High
+
 ---
+
 **Introduction**:
 
 **Expected Advantages**: FQ-Codel currently uses traditioal hashing to hash the flows into the queues and it is suboptimal. This works well for modernate number of flows such as seen in a home gateway. As the number of flows increase, the number of hash collision also increase. The birthday problem provides a more concrete view on why this occurs. There is a 50% chance of collision occuring as the number of flows reach the sqrt(number of buckets). The main aim of this project is, of course, to avoid this and reduce the chances of hash collisions. As mentioned in RFC 8290, with 1024 buckets and perfect hashing the probability of no collision occuring with 100 flows is 90.78%. This probability can be further improved by using set-associative hashing as it is again mentioned in the RFC. According to the author's analyitical equations, the probability of no collision with 8 way set associative hash is around 100% which is a significant improvement over the normal hashing technique. 
