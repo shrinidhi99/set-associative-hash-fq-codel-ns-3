@@ -7,19 +7,12 @@ of collision of flows into the same bucket rises to 50% when the number of flows
 the square root of the maximum number of buckets. The main aim of this project is to use
 set-associative hash in the ns-3 implementation of FQ-CoDel.
 
-**Required experience**: C, C++ and Fundamentals of Linux kernel
-
-**Bonus experience**: Knowledge of FQ and CoDel is a plus.
-
-**Difficulty**: High
-
 ---
 
 **Introduction**:
 
-**Expected Advantages**: FQ-Codel currently uses traditioal hashing to hash the flows into the queues and it is suboptimal. This works well for modernate number of flows such as seen in a home gateway. As the number of flows increase, the number of hash collision also increase. The birthday problem provides a more concrete view on why this occurs. There is a 50% chance of collision occuring as the number of flows reach the sqrt(number of buckets). The main aim of this project is, of course, to avoid this and reduce the chances of hash collisions. As mentioned in RFC 8290, with 1024 buckets and perfect hashing the probability of no collision occuring with 100 flows is 90.78%. This probability can be further improved by using set-associative hashing as it is again mentioned in the RFC. According to the author's analyitical equations, the probability of no collision with 8 way set associative hash is around 100% which is a significant improvement over the normal hashing technique. 
-
-Furthermore, the recent development of Comprehensive queue management system(CAKE) there is a need for set associative hashing as it is one of the main features develeoped in CAKE. This development can be further quickened by our project as it will involve the implementation of set associative hashing which can then be reused when CAKE is implemented in the future in ns3.  
+**Expected Advantages**: FQ-Codel currently uses traditional hashing to hash the flows into the queues, and it is suboptimal. This works well for a moderate number of flows, such as seen in a home gateway. As the number of flows increase, the number of hash collision also increases. The birthday problem provides a more concrete view of why this occurs. There is a 50% chance of a collision occurring as the number of flows reaches the sqrt(number of buckets). The main aim of this project is, of course, to avoid this and reduce the chances of hash collisions. As mentioned in RFC 8290, with 1024 buckets and perfect hashing the probability of no collision occurring with 100 flows is 90.78%. This probability can be further improved by using set-associative hashing as it is again mentioned in the RFC. According to the author's analytical equations, the probability of no collision with an 8-way set associative hash is around 100% which is a significant improvement over the normal hashing technique.
+Furthermore, in the recent development of the Comprehensive queue management system (CAKE), there is a need for set-associative hashing as it is one of the main features developed in CAKE. This development can be further quickened by our project as it will involve the implementation of set-associative hashing, which can then be reused when CAKE is implemented in the future in ns3.
 
 **Class Relationships, coupling and implementation details**: 
 
