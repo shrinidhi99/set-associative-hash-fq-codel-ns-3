@@ -19,10 +19,19 @@ Furthermore, in the recent development of the Comprehensive queue management sys
 
 **Class Relationships, coupling and implementation details**: 
 
-**References**: 
+**References**:
+* [**The Flow Queue CoDel Packet Scheduler and Active Queue Management Algorithm (RFC 8290)**](https://tools.ietf.org/html/rfc8290) 
+  
+  _This memo presents the FQ-CoDel hybrid packet scheduler and Active Queue Management (AQM) algorithm, a powerful tool for fighting bufferbloat and reducing latency._
 
----
-**Recommended reading**:
-* (RFC 8290) The Flow Queue CoDel Packet Scheduler and Active Queue Management Algorithm (Link: [https://tools.ietf.org/html/rfc8290](https://tools.ietf.org/html/rfc8290))
-* ns-3 code of FQ-CoDel (Link: [https://gitlab.com/nsnam/ns-3-dev/blob/master/src/traffic-control/model/fq-codel-queue-disc.h](https://gitlab.com/nsnam/ns-3-dev/blob/master/src/traffic-control/model/fq-codel-queue-disc.h))
-* Details of set associative hash (Link: [https://www.bufferbloat.net/projects/codel/wiki/CakeTechnical/](https://www.bufferbloat.net/projects/codel/wiki/CakeTechnical/))
+* [**ns-3 code of FQ-CoDel**](https://gitlab.com/nsnam/ns-3-dev/blob/master/src/traffic-control/model/fq-codel-queue-disc.h) 
+  
+  _Provides ns-3 code of FQ-CoDel_
+
+* [**Cake Technical Information**](https://www.bufferbloat.net/projects/codel/wiki/CakeTechnical/)
+  
+  _Details of set-associative hash_
+ 
+* [**Piece of CAKE: A Comprehensive Queue Management Solution for Home Gateways**](https://arxiv.org/pdf/1804.07617.pdf)
+
+  _This paper presents Common Applications Kept Enhanced (CAKE), a comprehensive network queue management system designed specifically for home Internet gateways_
