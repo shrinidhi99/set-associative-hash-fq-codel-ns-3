@@ -26,7 +26,7 @@ Furthermore, in the recent development of the Comprehensive queue management sys
 
 * [**ns-3 code of FQ-CoDel**](https://gitlab.com/nsnam/ns-3-dev/blob/master/src/traffic-control/model/fq-codel-queue-disc.h) 
   
-  _Provides ns-3 code of FQ-CoDel_
+  _A flow queue used by the FqCoDel queue disc in ns3-dev_
 
 * [**Cake Technical Information**](https://www.bufferbloat.net/projects/codel/wiki/CakeTechnical/)
   
