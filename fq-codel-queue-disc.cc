@@ -29,7 +29,8 @@
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("FqCoDelQueueDisc");
-uint32_t tags[1024];
+
+uint32_t tags[1024];   // used to know the hash of the flow stored in a queue
 
 NS_OBJECT_ENSURE_REGISTERED (FqCoDelFlow);
 
@@ -158,10 +159,14 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 
   if (m_setAssociativity == true)
     {
+      // set associative hashing used 
+
       uint32_t h = 0;
-      uint32_t innerHash, outerHash;
+      uint32_t innerHash;   // the queue number in a given set, range (0, set_ways-1)
+      uint32_t outerHash;   // a multiple of set_ways denoting the set number, range (0, m_flows-1) 
       uint32_t flowHash;
-      uint32_t set_ways = 8;
+      uint32_t set_ways = 8;   // number of queues in a set   
+
       if (GetNPacketFilters () == 0)
         {
           flowHash = item->Hash (m_perturbation);
@@ -191,7 +196,12 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
       Ptr<FqCoDelFlow> flow;
       if (m_flowsIndices.find (outerHash) == m_flowsIndices.end ())
         {
-          NS_LOG_DEBUG ("Creating a new flow queue with index " << h);
+          // the set is currently not among the allotted flows
+          // create set_ways number of new flows, and enqueue packet into the first flow of this set
+          // store the index of this first flow in m_flowIndices corresponding to outerHash
+
+          NS_LOG_DEBUG ("Creating a new set of " << set_ways << " flow queues with index " << h);
+
           for (uint32_t i = 0; i < 8; i++)
             {
               flow = m_flowFactory.Create<FqCoDelFlow> ();
@@ -200,12 +210,16 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
               flow->SetQueueDisc (qd);
               AddQueueDiscClass (flow);
             }
+          
           m_flowsIndices[outerHash] = GetNQueueDiscClasses () - 8;
           flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[h]));
           flow->SetStatus (FqCoDelFlow::NEW_FLOW);
           flow->SetDeficit (m_quantum);
           m_newFlows.push_back (flow);
+
+          // used in the future to identify hash of the flow stored in a queue 
           tags[h] = flowHash;
+          
           flow->GetQueueDisc ()->Enqueue (item);
 
           NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
@@ -217,6 +231,9 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
         }
       else
         {
+          // in the set given by m_flowIndices[outerHash], check iteratively if any queue is free, or
+          // if the queue already stores a flow corresponding to the packet
+
           uint32_t i;
           bool flag = false;
           for (i = m_flowsIndices[outerHash]; i < m_flowsIndices[outerHash] + 8; i++)
@@ -233,8 +250,10 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
                       m_newFlows.push_back (flow);
                     }
                   flow->GetQueueDisc ()->Enqueue (item);
+                  
                   tags[outerHash + i] = flowHash;
                   flag = true;
+                  
                   NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
                                                              << m_flowsIndices[outerHash]);
 
@@ -248,10 +267,13 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 
           if (flag == false)
             {
+              // all queues are full, by default add packet to the first flow in the set
+
               flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
 
               flow->GetQueueDisc ()->Enqueue (item);
               tags[outerHash + i] = flowHash;
+              
               NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
                                                          << m_flowsIndices[outerHash]);
               if (GetCurrentSize () > GetMaxSize ())
@@ -261,8 +283,12 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
             }
         }
     }
+
+    
   else
     {
+      // set associative hashing not used
+
       uint32_t h = 0;
 
       if (GetNPacketFilters () == 0)
