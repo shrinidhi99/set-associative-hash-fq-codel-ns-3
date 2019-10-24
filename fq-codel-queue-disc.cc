@@ -120,10 +120,7 @@ FqCoDelQueueDisc::GetTypeId (void)
               "Perturbation",
               "The salt used as an additional input to the hash function used to classify packets",
               UintegerValue (0), MakeUintegerAccessor (&FqCoDelQueueDisc::m_perturbation),
-              MakeUintegerChecker<uint32_t> ())
-          .AddAttribute (
-              "SetAssociativity", "Variable to use setassociativity hash", BooleanValue (false),
-              MakeBooleanAccessor (&FqCoDelQueueDisc::m_setAssociativity), MakeBooleanChecker ());
+              MakeUintegerChecker<uint32_t> ());
   return tid;
 }
 
@@ -156,58 +153,113 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
   NS_LOG_FUNCTION (this << item);
 
-  if (m_setAssociativity == true)
+  uint32_t h = 0;
+  uint32_t innerHash, outerHash;
+  uint32_t flowHash;
+  uint32_t set_ways = 8;
+
+  if (GetNPacketFilters () == 0)
     {
-      uint32_t h = 0;
-      uint32_t innerHash, outerHash;
-      uint32_t flowHash;
-      uint32_t set_ways = 8;
-      if (GetNPacketFilters () == 0)
+      flowHash = item->Hash (m_perturbation);
+      h = (flowHash % m_flows);
+      innerHash = h % set_ways;
+      outerHash = h - innerHash;
+    }
+  else
+    {
+      int32_t ret = Classify (item);
+
+      if (ret != PacketFilter::PF_NO_MATCH)
         {
-          flowHash = item->Hash (m_perturbation);
-          h = (flowHash % m_flows);
+          flowHash = ret;
+          h = ret % m_flows;
           innerHash = h % set_ways;
           outerHash = h - innerHash;
         }
       else
         {
-          int32_t ret = Classify (item);
+          NS_LOG_ERROR ("No filter has been able to classify this packet, drop it.");
+          DropBeforeEnqueue (item, UNCLASSIFIED_DROP);
+          return false;
+        }
+    }
 
-          if (ret != PacketFilter::PF_NO_MATCH)
+  Ptr<FqCoDelFlow> flow;
+  if (m_flowsIndices.find (outerHash) == m_flowsIndices.end ())
+    {
+      NS_LOG_DEBUG ("Creating a new flow queue with index " << h);
+      for (uint32_t i = 0; i < 8; i++)
+        {
+          // NS_LOG_DEBUG ("IN Loop " << i);
+          flow = m_flowFactory.Create<FqCoDelFlow> ();
+          Ptr<QueueDisc> qd = m_queueDiscFactory.Create<QueueDisc> ();
+          qd->Initialize ();
+          flow->SetQueueDisc (qd);
+          AddQueueDiscClass (flow);
+        }
+      m_flowsIndices[outerHash] = GetNQueueDiscClasses () - 8;
+      flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[h]));
+      flow->SetStatus (FqCoDelFlow::NEW_FLOW);
+      flow->SetDeficit (m_quantum);
+      m_newFlows.push_back (flow);
+      tags[h] = flowHash;
+      flow->GetQueueDisc ()->Enqueue (item);
+      // tags[outerHash + i] = flowHash;
+      NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
+                                                 << m_flowsIndices[outerHash]);
+      if (GetCurrentSize () > GetMaxSize ())
+        {
+          FqCoDelDrop ();
+        }
+    }
+  else
+    {
+      // NS_LOG_DEBUG ("Inside Else ");
+      uint32_t i;
+      bool flag = false;
+      for (i = m_flowsIndices[outerHash]; i < m_flowsIndices[outerHash] + 8; i++)
+        {
+          flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (i));
+
+          // if(flow->GetStatus () == FqCoDelFlow::INACTIVE){
+          //    flow->SetStatus (FqCoDelFlow::NEW_FLOW);
+          //    flow->SetDeficit (m_quantum);
+          //    m_newFlows.push_back (flow);
+          //    flag = true;
+          //    break;
+          // }
+
+          if (tags[outerHash + i - m_flowsIndices[outerHash]] == flowHash ||
+              flow->GetStatus () == FqCoDelFlow::INACTIVE)
             {
-              flowHash = ret;
-              h = ret % m_flows;
-              innerHash = h % set_ways;
-              outerHash = h - innerHash;
-            }
-          else
-            {
-              NS_LOG_ERROR ("No filter has been able to classify this packet, drop it.");
-              DropBeforeEnqueue (item, UNCLASSIFIED_DROP);
-              return false;
+              if (flow->GetStatus () == FqCoDelFlow::INACTIVE)
+                {
+                  flow->SetStatus (FqCoDelFlow::NEW_FLOW);
+                  flow->SetDeficit (m_quantum);
+                  m_newFlows.push_back (flow);
+                }
+              flow->GetQueueDisc ()->Enqueue (item);
+              tags[outerHash + i] = flowHash;
+              flag = true;
+              NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
+                                                         << m_flowsIndices[outerHash]);
+
+              if (GetCurrentSize () > GetMaxSize ())
+                {
+                  FqCoDelDrop ();
+                }
+              break;
             }
         }
 
-      Ptr<FqCoDelFlow> flow;
-      if (m_flowsIndices.find (outerHash) == m_flowsIndices.end ())
+      if (flag == false)
         {
-          NS_LOG_DEBUG ("Creating a new flow queue with index " << h);
-          for (uint32_t i = 0; i < 8; i++)
-            {
-              flow = m_flowFactory.Create<FqCoDelFlow> ();
-              Ptr<QueueDisc> qd = m_queueDiscFactory.Create<QueueDisc> ();
-              qd->Initialize ();
-              flow->SetQueueDisc (qd);
-              AddQueueDiscClass (flow);
-            }
-          m_flowsIndices[outerHash] = GetNQueueDiscClasses () - 8;
-          flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[h]));
-          flow->SetStatus (FqCoDelFlow::NEW_FLOW);
-          flow->SetDeficit (m_quantum);
-          m_newFlows.push_back (flow);
-          tags[h] = flowHash;
+          flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
+          // flow->SetStatus (FqCoDelFlow::NEW_FLOW);
+          // flow->SetDeficit (m_quantum);
+          // m_newFlows.push_back (flow);
           flow->GetQueueDisc ()->Enqueue (item);
-
+          tags[outerHash + i] = flowHash;
           NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
                                                      << m_flowsIndices[outerHash]);
           if (GetCurrentSize () > GetMaxSize ())
@@ -215,109 +267,23 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
               FqCoDelDrop ();
             }
         }
-      else
-        {
-          uint32_t i;
-          bool flag = false;
-          for (i = m_flowsIndices[outerHash]; i < m_flowsIndices[outerHash] + 8; i++)
-            {
-              flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (i));
-
-              if (tags[outerHash + i - m_flowsIndices[outerHash]] == flowHash ||
-                  flow->GetStatus () == FqCoDelFlow::INACTIVE)
-                {
-                  if (flow->GetStatus () == FqCoDelFlow::INACTIVE)
-                    {
-                      flow->SetStatus (FqCoDelFlow::NEW_FLOW);
-                      flow->SetDeficit (m_quantum);
-                      m_newFlows.push_back (flow);
-                    }
-                  flow->GetQueueDisc ()->Enqueue (item);
-                  tags[outerHash + i] = flowHash;
-                  flag = true;
-                  NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-                                                             << m_flowsIndices[outerHash]);
-
-                  if (GetCurrentSize () > GetMaxSize ())
-                    {
-                      FqCoDelDrop ();
-                    }
-                  break;
-                }
-            }
-
-          if (flag == false)
-            {
-              flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
-
-              flow->GetQueueDisc ()->Enqueue (item);
-              tags[outerHash + i] = flowHash;
-              NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-                                                         << m_flowsIndices[outerHash]);
-              if (GetCurrentSize () > GetMaxSize ())
-                {
-                  FqCoDelDrop ();
-                }
-            }
-        }
     }
-  else
-    {
-      uint32_t h = 0;
 
-      if (GetNPacketFilters () == 0)
-        {
-          h = item->Hash (m_perturbation) % m_flows;
-        }
-      else
-        {
-          int32_t ret = Classify (item);
+  //   if (flow->GetStatus () == FqCoDelFlow::INACTIVE)
+  //     {
+  //       flow->SetStatus (FqCoDelFlow::NEW_FLOW);
+  //       flow->SetDeficit (m_quantum);
+  //       m_newFlows.push_back (flow);
+  //     }
 
-          if (ret != PacketFilter::PF_NO_MATCH)
-            {
-              h = ret % m_flows;
-            }
-          else
-            {
-              NS_LOG_ERROR ("No filter has been able to classify this packet, drop it.");
-              DropBeforeEnqueue (item, UNCLASSIFIED_DROP);
-              return false;
-            }
-        }
+  //   flow->GetQueueDisc ()->Enqueue (item);
 
-      Ptr<FqCoDelFlow> flow;
-      if (m_flowsIndices.find (h) == m_flowsIndices.end ())
-        {
-          NS_LOG_DEBUG ("Creating a new flow queue with index " << h);
-          flow = m_flowFactory.Create<FqCoDelFlow> ();
-          Ptr<QueueDisc> qd = m_queueDiscFactory.Create<QueueDisc> ();
-          qd->Initialize ();
-          flow->SetQueueDisc (qd);
-          AddQueueDiscClass (flow);
+  //   NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index " << m_flowsIndices[h]);
 
-          m_flowsIndices[h] = GetNQueueDiscClasses () - 1;
-        }
-      else
-        {
-          flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[h]));
-        }
-
-      if (flow->GetStatus () == FqCoDelFlow::INACTIVE)
-        {
-          flow->SetStatus (FqCoDelFlow::NEW_FLOW);
-          flow->SetDeficit (m_quantum);
-          m_newFlows.push_back (flow);
-        }
-
-      flow->GetQueueDisc ()->Enqueue (item);
-
-      NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index " << m_flowsIndices[h]);
-
-      if (GetCurrentSize () > GetMaxSize ())
-        {
-          FqCoDelDrop ();
-        }
-    }
+  //   if (GetCurrentSize () > GetMaxSize ())
+  //     {
+  //       FqCoDelDrop ();
+  //     }
 
   return true;
 }
