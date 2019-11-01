@@ -628,7 +628,8 @@ FqCoDelQueueDiscUDPFlowsSeparation::DoRun (void)
 }
 
 /**
- * This class tests the deficit per flow
+ * This class tests Linear probing capability, collision response, and set creation capability of SetAssociative Hashing in fqCodel
+ * 
  */
 class FqCoDelQueueDiscSetLinearProbing : public TestCase
 {
@@ -659,6 +660,8 @@ FqCoDelQueueDiscSetLinearProbing::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4He
   queue->Enqueue (item);
 }
 
+
+
 void
 FqCoDelQueueDiscSetLinearProbing::DoRun (void)
 {
@@ -674,7 +677,7 @@ FqCoDelQueueDiscSetLinearProbing::DoRun (void)
   hdr.SetSource (Ipv4Address ("10.10.1.1"));
   hdr.SetDestination (Ipv4Address ("10.10.1.2"));
   hdr.SetProtocol (7);
-  // Add a packet from the first flow
+  // Add packets from the flow
   hash = 0;
   AddPacket (queueDisc, hdr);
   hash = 1;
@@ -700,30 +703,33 @@ FqCoDelQueueDiscSetLinearProbing::DoRun (void)
   NS_TEST_ASSERT_MSG_EQ (queueDisc->QueueDisc::GetNPackets (), 11,
                          "unexpected number of packets in the queue disc");
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (0)->GetQueueDisc ()->GetNPackets (), 2,
-                         "unexpected number of packets in the first flow queue");
+                         "unexpected number of packets in the first flow queue of set one");
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (1)->GetQueueDisc ()->GetNPackets (), 2,
-                         "unexpected number of packets in the first flow queue");
+                         "unexpected number of packets in the second flow queue of set one");
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (2)->GetQueueDisc ()->GetNPackets (), 1,
-                         "unexpected number of packets in the first flow queue");
+                         "unexpected number of packets in the third flow queue of set one");
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (3)->GetQueueDisc ()->GetNPackets (), 1,
-                         "unexpected number of packets in the first flow queue");
+                         "unexpected number of packets in the fourth flow queue of set one");
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (4)->GetQueueDisc ()->GetNPackets (), 2,
-                         "unexpected number of packets in the first flow queue");
+                         "unexpected number of packets in the fifth flow queue of set one");
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (5)->GetQueueDisc ()->GetNPackets (), 1,
-                         "unexpected number of packets in the first flow queue");
+                         "unexpected number of packets in the sixth flow queue of set one");
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (6)->GetQueueDisc ()->GetNPackets (), 1,
-                         "unexpected number of packets in the first flow queue");
+                         "unexpected number of packets in the seventh flow queue of set one");
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (7)->GetQueueDisc ()->GetNPackets (), 1,
-                         "unexpected number of packets in the first flow queue");
+                         "unexpected number of packets in the eigth flow queue of set one");
 
+  // Add packets from the flow but with a different hash than the ones already situated
+  // in first queue of set 1. This should go to the first queue of set 1. 
   hash = 1025;
   AddPacket (queueDisc, hdr);
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (0)->GetQueueDisc ()->GetNPackets (), 3,
-                         "Packet with hash 1025 is added to queue 0");
+                         "unexpected number of packets in the first flow of set one");
+  // Add packets from the flow with hash that falls into a different set
   hash = 10;
   AddPacket (queueDisc, hdr);
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (8)->GetQueueDisc ()->GetNPackets (), 1,
-                         "A new Set is created");
+                         "unexpected number of packets in the first flow of set two");
 
   // Ptr<FqCoDelFlow> flow1 = StaticCast<FqCoDelFlow> (queueDisc->GetQueueDiscClass (0));
   // NS_TEST_ASSERT_MSG_EQ (flow1->GetDeficit (), static_cast<int32_t> (queueDisc->GetQuantum ()),
