@@ -37,3 +37,14 @@ Furthermore, set associative hashing is a prominent feature of the comprehensive
 * [**Piece of CAKE: A Comprehensive Queue Management Solution for Home Gateways**](https://arxiv.org/pdf/1804.07617.pdf)
 
   _This paper presents Common Applications Kept Enhanced (CAKE), a comprehensive network queue management system designed specifically for home Internet gateways_
+  
+**Testing**: 
+
+Commands to Run:
+
+NS_LOG="FqCoDelQueueDisc" ./test.py -s fq-codel-queue-disc --text=results
+
+NS_LOG="FqCoDelQueueDisc" ./waf --run "test-runner --suite=fq-codel-queue-disc"
+
+NS_LOG="FqCoDelQueueDisc:FqCoDelQueueDisc2:PacketFilter:QueueDisc" ./waf --run "test-runner --suite=fq-codel-queue-disc"
+
