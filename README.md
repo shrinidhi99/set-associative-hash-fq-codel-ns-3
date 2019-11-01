@@ -40,11 +40,11 @@ Furthermore, set associative hashing is a prominent feature of the comprehensive
   
 **Testing**: 
 
-Commands to Run:
-
+> Commands to Run:
+```shell
 NS_LOG="FqCoDelQueueDisc" ./test.py -s fq-codel-queue-disc --text=results
 
 NS_LOG="FqCoDelQueueDisc" ./waf --run "test-runner --suite=fq-codel-queue-disc"
 
 NS_LOG="FqCoDelQueueDisc:FqCoDelQueueDisc2:PacketFilter:QueueDisc" ./waf --run "test-runner --suite=fq-codel-queue-disc"
-
+```
