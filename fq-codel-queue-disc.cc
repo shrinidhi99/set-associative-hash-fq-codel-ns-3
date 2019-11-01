@@ -29,8 +29,7 @@
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("FqCoDelQueueDisc");
-
-uint32_t tags[1024];   // used to know the hash of the flow stored in a queue
+uint32_t tags[1024];
 
 NS_OBJECT_ENSURE_REGISTERED (FqCoDelFlow);
 
@@ -157,18 +156,15 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
   NS_LOG_FUNCTION (this << item);
 
-  if (m_setAssociativity == true)
+  if (m_setAssociativity)
     {
-      // set associative hashing used 
-
       uint32_t h = 0;
-      uint32_t innerHash;   // the queue number in a given set, range (0, set_ways-1)
-      uint32_t outerHash;   // a multiple of set_ways denoting the set number, range (0, m_flows-1) 
+      uint32_t innerHash, outerHash;
       uint32_t flowHash;
-      uint32_t set_ways = 8;   // number of queues in a set   
-
+      uint32_t set_ways = 8;
       if (GetNPacketFilters () == 0)
         {
+          NS_LOG_DEBUG("InsideFirstIF");
           flowHash = item->Hash (m_perturbation);
           h = (flowHash % m_flows);
           innerHash = h % set_ways;
@@ -176,10 +172,12 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
         }
       else
         {
+
           int32_t ret = Classify (item);
 
           if (ret != PacketFilter::PF_NO_MATCH)
             {
+              NS_LOG_DEBUG("InsideIF");
               flowHash = ret;
               h = ret % m_flows;
               innerHash = h % set_ways;
@@ -187,6 +185,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
             }
           else
             {
+              NS_LOG_DEBUG("InsideElse");
               NS_LOG_ERROR ("No filter has been able to classify this packet, drop it.");
               DropBeforeEnqueue (item, UNCLASSIFIED_DROP);
               return false;
@@ -196,12 +195,8 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
       Ptr<FqCoDelFlow> flow;
       if (m_flowsIndices.find (outerHash) == m_flowsIndices.end ())
         {
-          // the set is currently not among the allotted flows
-          // create set_ways number of new flows, and enqueue packet into the first flow of this set
-          // store the index of this first flow in m_flowIndices corresponding to outerHash
-
-          NS_LOG_DEBUG ("Creating a new set of " << set_ways << " flow queues with index " << h);
-
+          // NS_LOG_DEBUG ("Creating a new flow queue with index " << h << "; flow index "
+          //                                                    << m_flowsIndices[outerHash] << " index of queue " << i - m_flowsIndices[outerHash]);
           for (uint32_t i = 0; i < 8; i++)
             {
               flow = m_flowFactory.Create<FqCoDelFlow> ();
@@ -210,20 +205,16 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
               flow->SetQueueDisc (qd);
               AddQueueDiscClass (flow);
             }
-          
           m_flowsIndices[outerHash] = GetNQueueDiscClasses () - 8;
-          flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[h]));
+          flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
           flow->SetStatus (FqCoDelFlow::NEW_FLOW);
           flow->SetDeficit (m_quantum);
           m_newFlows.push_back (flow);
-
-          // used in the future to identify hash of the flow stored in a queue 
-          tags[h] = flowHash;
-          
+          tags[outerHash] = flowHash;
           flow->GetQueueDisc ()->Enqueue (item);
 
           NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-                                                     << m_flowsIndices[outerHash]);
+                                                             << m_flowsIndices[outerHash] << " index of queue " << 0);
           if (GetCurrentSize () > GetMaxSize ())
             {
               FqCoDelDrop ();
@@ -231,13 +222,11 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
         }
       else
         {
-          // in the set given by m_flowIndices[outerHash], check iteratively if any queue is free, or
-          // if the queue already stores a flow corresponding to the packet
-
           uint32_t i;
           bool flag = false;
           for (i = m_flowsIndices[outerHash]; i < m_flowsIndices[outerHash] + 8; i++)
             {
+              NS_LOG_DEBUG ("i inside " << i << " flowHash " << flowHash << " something " <<tags[outerHash + i - m_flowsIndices[outerHash]]);
               flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (i));
 
               if (tags[outerHash + i - m_flowsIndices[outerHash]] == flowHash ||
@@ -250,12 +239,10 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
                       m_newFlows.push_back (flow);
                     }
                   flow->GetQueueDisc ()->Enqueue (item);
-                  
                   tags[outerHash + i] = flowHash;
                   flag = true;
-                  
                   NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-                                                             << m_flowsIndices[outerHash]);
+                                                             << m_flowsIndices[outerHash] << " index of queue " << i - m_flowsIndices[outerHash]);
 
                   if (GetCurrentSize () > GetMaxSize ())
                     {
@@ -267,13 +254,10 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 
           if (flag == false)
             {
-              // all queues are full, by default add packet to the first flow in the set
-
               flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
 
               flow->GetQueueDisc ()->Enqueue (item);
               tags[outerHash + i] = flowHash;
-              
               NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
                                                          << m_flowsIndices[outerHash]);
               if (GetCurrentSize () > GetMaxSize ())
@@ -283,12 +267,8 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
             }
         }
     }
-
-    
   else
     {
-      // set associative hashing not used
-
       uint32_t h = 0;
 
       if (GetNPacketFilters () == 0)
@@ -298,10 +278,12 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
       else
         {
           int32_t ret = Classify (item);
+          NS_LOG_DEBUG ("DoClassify " << ret);
 
           if (ret != PacketFilter::PF_NO_MATCH)
             {
               h = ret % m_flows;
+              NS_LOG_DEBUG ("Inside IF PF_NO_MATCH " << h);
             }
           else
             {
