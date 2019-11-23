@@ -25,6 +25,12 @@
 #include "fq-codel-queue-disc.h"
 #include "codel-queue-disc.h"
 #include "ns3/net-device-queue-interface.h"
+#include "unordered_set"
+
+uint32_t n_flows;
+uint32_t n_collisions;
+
+std::unordered_set <uint32_t> flowSet;
 
 namespace ns3 {
 
@@ -213,6 +219,10 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           tags[outerHash] = flowHash;
           flow->GetQueueDisc ()->Enqueue (item);
 
+          // collision code added here
+          flowSet.insert(flowHash);
+          n_flows++;
+
           NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
                                                              << m_flowsIndices[outerHash] << " index of queue " << 0);
           if (GetCurrentSize () > GetMaxSize ())
@@ -237,9 +247,13 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
                       flow->SetStatus (FqCoDelFlow::NEW_FLOW);
                       flow->SetDeficit (m_quantum);
                       m_newFlows.push_back (flow);
+
+                      // collision code added here
+                      flowSet.insert(flowHash);
+                      n_flows++;
                     }
                   flow->GetQueueDisc ()->Enqueue (item);
-                  tags[outerHash + i] = flowHash;
+                  tags[outerHash + i - m_flowsIndices[outerHash]] = flowHash;
                   flag = true;
                   NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
                                                              << m_flowsIndices[outerHash] << " index of queue " << i - m_flowsIndices[outerHash]);
@@ -260,6 +274,19 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
               tags[outerHash + i] = flowHash;
               NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
                                                          << m_flowsIndices[outerHash]);
+
+              // collision code added here
+
+              if(flowSet.find(flowHash) == flowSet.end() && i == m_flowsIndices[outerHash] + 8){
+                n_collisions++;
+                n_flows++;
+                NS_LOG_DEBUG("collision code written here\n");
+                NS_LOG_DEBUG(n_flows " " << n_collisions << "\n");
+                flowSet.insert(flowHash);
+              }
+              
+
+
               if (GetCurrentSize () > GetMaxSize ())
                 {
                   FqCoDelDrop ();

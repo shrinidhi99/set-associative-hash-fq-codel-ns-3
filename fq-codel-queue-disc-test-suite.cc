@@ -717,28 +717,28 @@ FqCoDelQueueDiscSetLinearProbing::DoRun (void)
 }
 
 
-class FqCoDelQueueDiscCollison : public TestCase
+class FqCoDelQueueDiscCollision : public TestCase
 {
 public:
-  FqCoDelQueueDiscCollison ();
-  virtual ~FqCoDelQueueDiscCollison ();
+  FqCoDelQueueDiscCollision ();
+  virtual ~FqCoDelQueueDiscCollision ();
 
 private:
   virtual void DoRun (void);
   void AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr);
 };
 
-FqCoDelQueueDiscCollison::FqCoDelQueueDiscCollison ()
+FqCoDelQueueDiscCollision::FqCoDelQueueDiscCollision ()
     : TestCase ("Test credits and flows status")
 {
 }
 
-FqCoDelQueueDiscCollison::~FqCoDelQueueDiscCollison ()
+FqCoDelQueueDiscCollision::~FqCoDelQueueDiscCollision ()
 {
 }
 
 void
-FqCoDelQueueDiscCollison::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr)
+FqCoDelQueueDiscCollision::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr)
 {
   Ptr<Packet> p = Create<Packet> (100);
   Address dest;
@@ -749,7 +749,7 @@ FqCoDelQueueDiscCollison::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr
 
 
 void
-FqCoDelQueueDiscCollison::DoRun (void)
+FqCoDelQueueDiscCollision::DoRun (void)
 {
   Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("SetAssociativity", BooleanValue (true));
   queueDisc->SetQuantum (90);
@@ -821,7 +821,7 @@ FqCoDelQueueDiscTestSuite::FqCoDelQueueDiscTestSuite () : TestSuite ("fq-codel-q
   AddTestCase (new FqCoDelQueueDiscTCPFlowsSeparation, TestCase::QUICK);
   AddTestCase (new FqCoDelQueueDiscUDPFlowsSeparation, TestCase::QUICK);
   AddTestCase (new FqCoDelQueueDiscSetLinearProbing, TestCase::QUICK);
-  AddTestCase (new FqCoDelQueueDiscCollison, TestCase::QUICK);
+  AddTestCase (new FqCoDelQueueDiscCollision, TestCase::QUICK);
 }
 
 static FqCoDelQueueDiscTestSuite fqCoDelQueueDiscTestSuite;
