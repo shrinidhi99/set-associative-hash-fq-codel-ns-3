@@ -257,7 +257,7 @@ FqCoDelQueueDiscDeficit::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr)
 void
 FqCoDelQueueDiscDeficit::DoRun (void)
 {
-  Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ();
+  Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("SetAssociativity", BooleanValue(true));
   queueDisc->SetQuantum (90);
   queueDisc->Initialize ();
 
@@ -461,7 +461,7 @@ void
 FqCoDelQueueDiscTCPFlowsSeparation::DoRun (void)
 {
   Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> (
-      "MaxSize", StringValue ("4p"), "SetAssociativity", BooleanValue (true));
+      "MaxSize", StringValue ("10p"), "SetAssociativity", BooleanValue (true));
 
   queueDisc->SetQuantum (1500);
   queueDisc->Initialize ();
@@ -563,7 +563,7 @@ void
 FqCoDelQueueDiscUDPFlowsSeparation::DoRun (void)
 {
   Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> (
-      "MaxSize", StringValue ("4p"), "SetAssociativity", BooleanValue (true));
+      "MaxSize", StringValue ("10p"), "SetAssociativity", BooleanValue (true));
 
   queueDisc->SetQuantum (1500);
   queueDisc->Initialize ();
@@ -741,11 +741,11 @@ public:
 
 FqCoDelQueueDiscTestSuite::FqCoDelQueueDiscTestSuite () : TestSuite ("fq-codel-queue-disc", UNIT)
 {
-  // AddTestCase (new FqCoDelQueueDiscNoSuitableFilter, TestCase::QUICK);
-  // AddTestCase (new FqCoDelQueueDiscIPFlowsSeparationAndPacketLimit, TestCase::QUICK);
-  // AddTestCase (new FqCoDelQueueDiscDeficit, TestCase::QUICK);
-  // AddTestCase (new FqCoDelQueueDiscTCPFlowsSeparation, TestCase::QUICK);
-  // AddTestCase (new FqCoDelQueueDiscUDPFlowsSeparation, TestCase::QUICK);
+  AddTestCase (new FqCoDelQueueDiscNoSuitableFilter, TestCase::QUICK);
+  AddTestCase (new FqCoDelQueueDiscIPFlowsSeparationAndPacketLimit, TestCase::QUICK);
+  AddTestCase (new FqCoDelQueueDiscDeficit, TestCase::QUICK);
+  AddTestCase (new FqCoDelQueueDiscTCPFlowsSeparation, TestCase::QUICK);
+  AddTestCase (new FqCoDelQueueDiscUDPFlowsSeparation, TestCase::QUICK);
   AddTestCase (new FqCoDelQueueDiscSetLinearProbing, TestCase::QUICK);
 }
 
