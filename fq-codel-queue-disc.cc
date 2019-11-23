@@ -226,7 +226,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           bool flag = false;
           for (i = m_flowsIndices[outerHash]; i < m_flowsIndices[outerHash] + 8; i++)
             {
-              NS_LOG_DEBUG ("i inside " << i << " flowHash " << flowHash << " something " <<tags[outerHash + i - m_flowsIndices[outerHash]]);
+              // NS_LOG_DEBUG ("i inside " << i << " flowHash " << flowHash << " something " <<tags[outerHash + i - m_flowsIndices[outerHash]]);
               flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (i));
 
               if (tags[outerHash + i - m_flowsIndices[outerHash]] == flowHash ||
