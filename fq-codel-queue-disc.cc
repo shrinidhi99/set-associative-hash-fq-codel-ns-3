@@ -27,10 +27,10 @@
 #include "ns3/net-device-queue-interface.h"
 #include "unordered_set"
 
-uint32_t n_flows;
-uint32_t n_collisions;
+uint32_t n_flows = 0;
+uint32_t n_collisions = 0;
 
-std::unordered_set <uint32_t> flowSet;
+std::unordered_set<uint32_t> flowSet;
 
 namespace ns3 {
 
@@ -161,7 +161,14 @@ bool
 FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
   // NS_LOG_FUNCTION (this << item);
-
+  if (n_flows % 100 == 0)
+    {
+      std::cout << n_flows << " " << n_collisions << "\n";
+    }
+  if (n_flows >= 2000)
+    {
+      exit (0);
+    }
   if (m_setAssociativity)
     {
       uint32_t h = 0;
@@ -198,13 +205,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
               return false;
             }
         }
-              
-              if(n_flows%100 == 0){
-                  std::cout<<"Number of flows "<< n_flows << " " << "Num of collisions "<<n_collisions << "InnerHash " << innerHash <<"outerHash " <<outerHash<< "\n";  
-              }
-              if(n_flows >= 2000){
-                  exit(0);
-              }
 
       Ptr<FqCoDelFlow> flow;
       if (m_flowsIndices.find (outerHash) == m_flowsIndices.end ())
@@ -228,11 +228,11 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           flow->GetQueueDisc ()->Enqueue (item);
 
           // collision code added here
-          flowSet.insert(flowHash);
+          flowSet.insert (flowHash);
           n_flows++;
 
           // NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-                                                             // << m_flowsIndices[outerHash] << " index of queue " << 0);
+          // << m_flowsIndices[outerHash] << " index of queue " << 0);
           if (GetCurrentSize () > GetMaxSize ())
             {
               FqCoDelDrop ();
@@ -255,16 +255,16 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
                       flow->SetStatus (FqCoDelFlow::NEW_FLOW);
                       flow->SetDeficit (m_quantum);
                       m_newFlows.push_back (flow);
-
+                      
                       // collision code added here
-                      flowSet.insert(flowHash);
+                      flowSet.insert (flowHash);
                       n_flows++;
                     }
                   flow->GetQueueDisc ()->Enqueue (item);
                   tags[outerHash + i - m_flowsIndices[outerHash]] = flowHash;
                   flag = true;
                   // NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-                                                             // << m_flowsIndices[outerHash] << " index of queue " << i - m_flowsIndices[outerHash]);
+                  // << m_flowsIndices[outerHash] << " index of queue " << i - m_flowsIndices[outerHash]);
 
                   if (GetCurrentSize () > GetMaxSize ())
                     {
@@ -277,26 +277,14 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           if (flag == false)
             {
               flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
-
               flow->GetQueueDisc ()->Enqueue (item);
+              n_collisions++;
+              n_flows++;
               tags[outerHash + i] = flowHash;
               // NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-                                                         // << m_flowsIndices[outerHash]);
+              // << m_flowsIndices[outerHash]);
 
               // collision code added here
-
-              if(flowSet.find(flowHash) == flowSet.end() && i == m_flowsIndices[outerHash] + 8){
-                n_collisions++;
-                n_flows++;
-                // NS_LOG_DEBUG("collision code written here\n");
-                // std::cout<<"Number of flows"<< n_flows << " " << "Num of collisions"<<n_collisions << "\n";
-                if(n_flows == 100){
-                  exit(0);
-                }
-                flowSet.insert(flowHash);
-              }
-              
-
 
               if (GetCurrentSize () > GetMaxSize ())
                 {
@@ -309,10 +297,11 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
     {
       uint32_t h = 0;
       uint32_t flowHash;
+      uint32_t tags[1024];
       if (GetNPacketFilters () == 0)
         {
           flowHash = item->Hash (m_perturbation);
-          h =  flowHash % m_flows;
+          h = flowHash % m_flows;
         }
       else
         {
@@ -332,12 +321,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
               return false;
             }
         }
-       if(n_flows%100 == 0){
-                  std::cout<<"Number of flows "<< n_flows << " " << "Num of collisions "<<n_collisions << "Hash" << h<< "\n"; 
-              }
-       if(n_flows >= 2000){
-                  exit(0);
-              }
       Ptr<FqCoDelFlow> flow;
       if (m_flowsIndices.find (h) == m_flowsIndices.end ())
         {
@@ -347,18 +330,20 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           qd->Initialize ();
           flow->SetQueueDisc (qd);
           AddQueueDiscClass (flow);
-          flowSet.insert(flowHash);
+          flowSet.insert (flowHash);
           m_flowsIndices[h] = GetNQueueDiscClasses () - 1;
+          tags[h] = flowHash;
+          n_flows++;
         }
       else
         {
-          if(flowSet.find(flowHash)==flowSet.end()){
-            flowSet.insert(flowHash);
-            n_collisions++;
-            n_flows++;
-          }
+          if (tags[h] != flowHash)
+            {
+              n_collisions++;
+              n_flows++;
+              tags[h] = flowHash;
+            }
           flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[h]));
-
         }
 
       if (flow->GetStatus () == FqCoDelFlow::INACTIVE)
@@ -366,9 +351,8 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           flow->SetStatus (FqCoDelFlow::NEW_FLOW);
           flow->SetDeficit (m_quantum);
           m_newFlows.push_back (flow);
-          flowSet.insert(flowHash);
-          n_flows++;
-        } 
+          flowSet.insert (flowHash);
+        }
 
       flow->GetQueueDisc ()->Enqueue (item);
 
