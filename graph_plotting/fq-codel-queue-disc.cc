@@ -25,6 +25,12 @@
 #include "fq-codel-queue-disc.h"
 #include "codel-queue-disc.h"
 #include "ns3/net-device-queue-interface.h"
+#include "unordered_set"
+
+uint32_t n_flows = 0;
+uint32_t n_collisions = 0;
+
+std::unordered_set<uint32_t> flowSet;
 
 namespace ns3 {
 
@@ -45,46 +51,46 @@ FqCoDelFlow::GetTypeId (void)
 
 FqCoDelFlow::FqCoDelFlow () : m_deficit (0), m_status (INACTIVE)
 {
-  NS_LOG_FUNCTION (this);
+  // NS_LOG_FUNCTION (this);
 }
 
 FqCoDelFlow::~FqCoDelFlow ()
 {
-  NS_LOG_FUNCTION (this);
+  // NS_LOG_FUNCTION (this);
 }
 
 void
 FqCoDelFlow::SetDeficit (uint32_t deficit)
 {
-  NS_LOG_FUNCTION (this << deficit);
+  // NS_LOG_FUNCTION (this << deficit);
   m_deficit = deficit;
 }
 
 int32_t
 FqCoDelFlow::GetDeficit (void) const
 {
-  NS_LOG_FUNCTION (this);
+  // NS_LOG_FUNCTION (this);
   return m_deficit;
 }
 
 void
 FqCoDelFlow::IncreaseDeficit (int32_t deficit)
 {
-  NS_LOG_FUNCTION (this << deficit);
+  // NS_LOG_FUNCTION (this << deficit);
   m_deficit += deficit;
 }
 
 void
 FqCoDelFlow::SetStatus (FlowStatus status)
 {
-  NS_LOG_FUNCTION (this);
+  // NS_LOG_FUNCTION (this);
   m_status = status;
 }
 
 FqCoDelFlow::FlowStatus
 FqCoDelFlow::GetStatus (void) const
 {
-  NS_LOG_FUNCTION (this);
+  // NS_LOG_FUNCTION (this);
   return m_status;
 }
 
@@ -130,18 +136,18 @@ FqCoDelQueueDisc::GetTypeId (void)
 FqCoDelQueueDisc::FqCoDelQueueDisc ()
     : QueueDisc (QueueDiscSizePolicy::MULTIPLE_QUEUES, QueueSizeUnit::PACKETS), m_quantum (0)
 {
-  NS_LOG_FUNCTION (this);
+  // NS_LOG_FUNCTION (this);
 }
 
 FqCoDelQueueDisc::~FqCoDelQueueDisc ()
 {
-  NS_LOG_FUNCTION (this);
+  // NS_LOG_FUNCTION (this);
 }
 
 void
 FqCoDelQueueDisc::SetQuantum (uint32_t quantum)
 {
-  NS_LOG_FUNCTION (this << quantum);
+  // NS_LOG_FUNCTION (this << quantum);
   m_quantum = quantum;
 }
 
@@ -154,17 +160,25 @@ FqCoDelQueueDisc::GetQuantum (void) const
 bool
 FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
-  NS_LOG_FUNCTION (this << item);
-
+  // NS_LOG_FUNCTION (this << item);
+  if (n_flows % 100 == 0)
+    {
+      std::cout << n_flows << " " << n_collisions << "\n";
+    }
+  if (n_flows >= 2000)
+    {
+      exit (0);
+    }
   if (m_setAssociativity)
     {
       uint32_t h = 0;
       uint32_t innerHash, outerHash;
       uint32_t flowHash;
       uint32_t set_ways = 8;
+
       if (GetNPacketFilters () == 0)
         {
-          NS_LOG_DEBUG("InsideFirstIF");
+          // NS_LOG_DEBUG("InsideFirstIF");
           flowHash = item->Hash (m_perturbation);
           h = (flowHash % m_flows);
           innerHash = h % set_ways;
@@ -177,7 +191,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 
           if (ret != PacketFilter::PF_NO_MATCH)
             {
-              NS_LOG_DEBUG("InsideIF");
+              // NS_LOG_DEBUG("InsideIF");
               flowHash = ret;
               h = ret % m_flows;
               innerHash = h % set_ways;
@@ -185,7 +199,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
             }
           else
             {
-              NS_LOG_DEBUG("InsideElse");
+              // NS_LOG_DEBUG("InsideElse");
               NS_LOG_ERROR ("No filter has been able to classify this packet, drop it.");
               DropBeforeEnqueue (item, UNCLASSIFIED_DROP);
               return false;
@@ -213,8 +227,12 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           tags[outerHash] = flowHash;
           flow->GetQueueDisc ()->Enqueue (item);
 
-          NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-                                                             << m_flowsIndices[outerHash] << " index of queue " << 0);
+          // collision code added here
+          flowSet.insert (flowHash);
+          n_flows++;
+
+          // NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
+          // << m_flowsIndices[outerHash] << " index of queue " << 0);
           if (GetCurrentSize () > GetMaxSize ())
             {
               FqCoDelDrop ();
@@ -237,12 +255,16 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
                       flow->SetStatus (FqCoDelFlow::NEW_FLOW);
                       flow->SetDeficit (m_quantum);
                       m_newFlows.push_back (flow);
+                      
+                      // collision code added here
+                      flowSet.insert (flowHash);
+                      n_flows++;
                     }
                   flow->GetQueueDisc ()->Enqueue (item);
-                  tags[outerHash + i] = flowHash;
+                  tags[outerHash + i - m_flowsIndices[outerHash]] = flowHash;
                   flag = true;
-                  NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-                                                             << m_flowsIndices[outerHash] << " index of queue " << i - m_flowsIndices[outerHash]);
+                  // NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
+                  // << m_flowsIndices[outerHash] << " index of queue " << i - m_flowsIndices[outerHash]);
 
                   if (GetCurrentSize () > GetMaxSize ())
                     {
@@ -255,11 +277,15 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           if (flag == false)
             {
               flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
-
               flow->GetQueueDisc ()->Enqueue (item);
+              n_collisions++;
+              n_flows++;
               tags[outerHash + i] = flowHash;
-              NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-                                                         << m_flowsIndices[outerHash]);
+              // NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
+              // << m_flowsIndices[outerHash]);
+
+              // collision code added here
+
               if (GetCurrentSize () > GetMaxSize ())
                 {
                   FqCoDelDrop ();
@@ -270,43 +296,53 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   else
     {
       uint32_t h = 0;
-
+      uint32_t flowHash;
+      uint32_t tags[1024];
       if (GetNPacketFilters () == 0)
         {
-          h = item->Hash (m_perturbation) % m_flows;
+          flowHash = item->Hash (m_perturbation);
+          h = flowHash % m_flows;
         }
       else
         {
           int32_t ret = Classify (item);
-          NS_LOG_DEBUG ("DoClassify " << ret);
+          // NS_LOG_DEBUG ("DoClassify " << ret);
 
           if (ret != PacketFilter::PF_NO_MATCH)
             {
-              h = ret % m_flows;
-              NS_LOG_DEBUG ("Inside IF PF_NO_MATCH " << h);
+              flowHash = ret;
+              h = flowHash % m_flows;
+              // NS_LOG_DEBUG ("Inside IF PF_NO_MATCH " << h);
             }
           else
             {
-              NS_LOG_ERROR ("No filter has been able to classify this packet, drop it.");
+              // NS_LOG_ERROR ("No filter has been able to classify this packet, drop it.");
               DropBeforeEnqueue (item, UNCLASSIFIED_DROP);
               return false;
             }
         }
-
       Ptr<FqCoDelFlow> flow;
       if (m_flowsIndices.find (h) == m_flowsIndices.end ())
         {
-          NS_LOG_DEBUG ("Creating a new flow queue with index " << h);
+          // NS_LOG_DEBUG ("Creating a new flow queue with index " << h);
           flow = m_flowFactory.Create<FqCoDelFlow> ();
           Ptr<QueueDisc> qd = m_queueDiscFactory.Create<QueueDisc> ();
           qd->Initialize ();
           flow->SetQueueDisc (qd);
           AddQueueDiscClass (flow);
-
+          flowSet.insert (flowHash);
           m_flowsIndices[h] = GetNQueueDiscClasses () - 1;
+          tags[h] = flowHash;
+          n_flows++;
         }
       else
         {
+          if (tags[h] != flowHash)
+            {
+              n_collisions++;
+              n_flows++;
+              tags[h] = flowHash;
+            }
           flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[h]));
         }
 
@@ -315,11 +351,12 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           flow->SetStatus (FqCoDelFlow::NEW_FLOW);
           flow->SetDeficit (m_quantum);
           m_newFlows.push_back (flow);
+          flowSet.insert (flowHash);
         }
 
       flow->GetQueueDisc ()->Enqueue (item);
 
-      NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index " << m_flowsIndices[h]);
+      // NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index " << m_flowsIndices[h]);
 
       if (GetCurrentSize () > GetMaxSize ())
         {
@@ -333,7 +370,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 Ptr<QueueDiscItem>
 FqCoDelQueueDisc::DoDequeue (void)
 {
-  NS_LOG_FUNCTION (this);
+  // NS_LOG_FUNCTION (this);
 
   Ptr<FqCoDelFlow> flow;
   Ptr<QueueDiscItem> item;
@@ -355,7 +392,7 @@ FqCoDelQueueDisc::DoDequeue (void)
             }
           else
             {
-              NS_LOG_DEBUG ("Found a new flow with positive deficit");
+              //NS_LOG_DEBUG ("Found a new flow with positive deficit");
               found = true;
             }
         }
@@ -372,14 +409,14 @@ FqCoDelQueueDisc::DoDequeue (void)
             }
           else
             {
-              NS_LOG_DEBUG ("Found an old flow with positive deficit");
+              // NS_LOG_DEBUG ("Found an old flow with positive deficit");
               found = true;
             }
         }
 
       if (!found)
         {
-          NS_LOG_DEBUG ("No flow found to dequeue a packet");
+          // NS_LOG_DEBUG ("No flow found to dequeue a packet");
           return 0;
         }
 
@@ -387,7 +424,7 @@ FqCoDelQueueDisc::DoDequeue (void)
 
       if (!item)
         {
-          NS_LOG_DEBUG ("Could not get a packet from the selected flow queue");
+          // NS_LOG_DEBUG ("Could not get a packet from the selected flow queue");
           if (!m_newFlows.empty ())
             {
               flow->SetStatus (FqCoDelFlow::OLD_FLOW);
@@ -402,7 +439,7 @@ FqCoDelQueueDisc::DoDequeue (void)
         }
       else
         {
-          NS_LOG_DEBUG ("Dequeued packet " << item->GetPacket ());
+          // NS_LOG_DEBUG ("Dequeued packet " << item->GetPacket ());
         }
     }
   while (item == 0);
@@ -415,7 +452,7 @@ FqCoDelQueueDisc::DoDequeue (void)
 bool
 FqCoDelQueueDisc::CheckConfig (void)
 {
-  NS_LOG_FUNCTION (this);
+  // NS_LOG_FUNCTION (this);
   if (GetNQueueDiscClasses () > 0)
     {
       NS_LOG_ERROR ("FqCoDelQueueDisc cannot have classes");
@@ -439,7 +476,7 @@ FqCoDelQueueDisc::CheckConfig (void)
       if (ndqi && (dev = ndqi->GetObject<NetDevice> ()))
         {
           m_quantum = dev->GetMtu ();
-          NS_LOG_DEBUG ("Setting the quantum to the MTU of the device: " << m_quantum);
+          // NS_LOG_DEBUG ("Setting the quantum to the MTU of the device: " << m_quantum);
         }
 
       if (!m_quantum)
@@ -455,7 +492,7 @@ FqCoDelQueueDisc::CheckConfig (void)
 void
 FqCoDelQueueDisc::InitializeParams (void)
 {
-  NS_LOG_FUNCTION (this);
+  // NS_LOG_FUNCTION (this);
 
   m_flowFactory.SetTypeId ("ns3::FqCoDelFlow");
   m_queueDiscFactory.SetTypeId ("ns3::CoDelQueueDisc");
@@ -467,7 +504,7 @@ FqCoDelQueueDisc::InitializeParams (void)
 uint32_t
 FqCoDelQueueDisc::FqCoDelDrop (void)
 {
-  NS_LOG_FUNCTION (this);
+  // NS_LOG_FUNCTION (this);
 
   uint32_t maxBacklog = 0, index = 0;
   Ptr<QueueDisc> qd;
