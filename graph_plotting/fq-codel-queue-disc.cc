@@ -156,6 +156,15 @@ FqCoDelQueueDisc::GetQuantum (void) const
 {
   return m_quantum;
 }
+/*
+* For set associative when the set is filled a new flow arrives to the same set then it is a collision. 
+* For the regular hash if a flow hashes into a queue which already contains a flow then it is a collision. 
+* For set associative a new flow is determined if the flow does not match with any of the tags in the set
+* For the regular hash a new flow is determined if the flow does not match with the tag of the queue it hashes to
+* For the regular hash if a flow hashes into a queue which already contains a flow then it is a collision. 
+* n_collision variable holds the values of collision
+* n_flows variable holds the value for the number of new flows 
+*/
 
 bool
 FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
@@ -255,8 +264,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
                       flow->SetStatus (FqCoDelFlow::NEW_FLOW);
                       flow->SetDeficit (m_quantum);
                       m_newFlows.push_back (flow);
-                      
-                      // collision code added here
                       flowSet.insert (flowHash);
                       n_flows++;
                     }
@@ -281,10 +288,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
               n_collisions++;
               n_flows++;
               tags[outerHash + i] = flowHash;
-              // NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-              // << m_flowsIndices[outerHash]);
-
-              // collision code added here
 
               if (GetCurrentSize () > GetMaxSize ())
                 {

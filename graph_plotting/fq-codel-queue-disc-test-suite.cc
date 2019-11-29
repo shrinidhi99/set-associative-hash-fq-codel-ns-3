@@ -724,6 +724,17 @@ FqCoDelQueueDiscSetLinearProbing::DoRun (void)
   Simulator::Destroy ();
 }
 
+/**
+* This test is used to determine the collisions in a real world scenario by enqueuing large number of packets 
+* with different Hash. DoClassify and CheckProtocol is modified so that the hash returned could be controlled for each packet
+* For set associative when the set is filled a new flow arrives to the same set then it is a collision. 
+* For the regular hash if a flow hashes into a queue which already contains a flow then it is a collision. 
+* Randomized values of Hash was used to generate the hash for the packets and then the results were calculated. 
+* These values are in the hashvalues.txt file. In the modified fq-codel-queue-disc.cc the program exits as soon
+* as 2000 new flow limit is reached until then new hashes are inserted into the fq-codel and the collision as well
+* as the number of new flows is incremented. 
+**/
+
 
 class FqCoDelQueueDiscCollision : public TestCase
 {
@@ -791,24 +802,6 @@ FqCoDelQueueDiscCollision::DoRun (void)
 
   }
   in.close();
-
-  // Add packets from the flow but with a different hash than the ones already situated
-  // in first queue of set 1. This should go to the first queue of set 1. 
-  // hash = 1025;
-  // AddPacket (queueDisc, hdr);
-  // NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (0)->GetQueueDisc ()->GetNPackets (), 3,
-  //                        "unexpected number of packets in the first flow of set one");
-  // // Add packets from the flow with hash that falls into a different set
-  // hash = 10;
-  // AddPacket (queueDisc, hdr);
-  // NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (8)->GetQueueDisc ()->GetNPackets (), 1,
-  //                        "unexpected number of packets in the first flow of set two");
-
-  // Ptr<FqCoDelFlow> flow1 = StaticCast<FqCoDelFlow> (queueDisc->GetQueueDiscClass (0));
-  // NS_TEST_ASSERT_MSG_EQ (flow1->GetDeficit (), static_cast<int32_t> (queueDisc->GetQuantum ()),
-  //                        "the deficit of the first flow must equal the quantum");
-  // NS_TEST_ASSERT_MSG_EQ (flow1->GetStatus (), FqCoDelFlow::NEW_FLOW,
-  //                        "the first flow must be in the list of new queues");
   Simulator::Destroy ();
 }
 
