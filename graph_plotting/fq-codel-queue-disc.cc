@@ -29,6 +29,7 @@
 
 uint32_t n_flows = 0;
 uint32_t n_collisions = 0;
+uint32_t filled_queues = 0;
 
 std::unordered_set<uint32_t> flowSet;
 
@@ -172,7 +173,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   // NS_LOG_FUNCTION (this << item);
   if (n_flows % 100 == 0)
     {
-      std::cout << n_flows << " " << n_collisions << "\n";
+      std::cout << n_flows << " " << n_collisions << " " << filled_queues << "\n" ;
     }
   if (n_flows >= 2000)
     {
@@ -239,6 +240,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           // collision code added here
           flowSet.insert (flowHash);
           n_flows++;
+          filled_queues++;
 
           // NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
           // << m_flowsIndices[outerHash] << " index of queue " << 0);
@@ -264,8 +266,11 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
                       flow->SetStatus (FqCoDelFlow::NEW_FLOW);
                       flow->SetDeficit (m_quantum);
                       m_newFlows.push_back (flow);
+                      
+                      // collision code added here
                       flowSet.insert (flowHash);
                       n_flows++;
+                      filled_queues++;
                     }
                   flow->GetQueueDisc ()->Enqueue (item);
                   tags[outerHash + i - m_flowsIndices[outerHash]] = flowHash;
@@ -285,9 +290,16 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
             {
               flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
               flow->GetQueueDisc ()->Enqueue (item);
-              n_collisions++;
-              n_flows++;
+              n_collisions+=1;
+              if(flowSet.find(flowHash)==flowSet.end()){
+                n_flows++;
+                flowSet.insert(flowHash);
+              }
               tags[outerHash + i] = flowHash;
+              // NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
+              // << m_flowsIndices[outerHash]);
+
+              // collision code added here
 
               if (GetCurrentSize () > GetMaxSize ())
                 {
@@ -337,13 +349,17 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           m_flowsIndices[h] = GetNQueueDiscClasses () - 1;
           tags[h] = flowHash;
           n_flows++;
+          filled_queues++;
         }
       else
         {
           if (tags[h] != flowHash)
             {
               n_collisions++;
-              n_flows++;
+              if(flowSet.find(flowHash)==flowSet.end()){
+                n_flows++;
+                flowSet.insert(flowHash);
+              }
               tags[h] = flowHash;
             }
           flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[h]));
@@ -369,6 +385,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 
   return true;
 }
+
 
 Ptr<QueueDiscItem>
 FqCoDelQueueDisc::DoDequeue (void)
