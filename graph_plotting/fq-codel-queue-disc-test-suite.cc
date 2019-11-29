@@ -606,7 +606,15 @@ FqCoDelQueueDiscUDPFlowsSeparation::DoRun (void)
 
 /**
  * This class tests Linear probing capability, collision response, and set creation capability of SetAssociative Hashing in fqCodel
- * SetAssociative hash is 
+ * SetAssociative hash.We modified DoClassify and CheckProtocol so that we could control the hash returned for each packet
+ * We use flow hashes ranging from 0 to 7. These must go into different queues in the same set. The set number is obtained by m_flowsIndices[0] which is 0.
+ * When a new packet comes in with flow 1024. Since 1024 % 1024 = 0, m_flowsIndices[0] = 0 is obtained, and the first set is iteratively searched. 
+ * The packet is added to queue 0 since the tag of the queues in the set don't match with the hash of the flow and the tag of the queue is updated.
+ * A packet with hash 1025 arrives. Since 1025 % 1024 = 1, m_flowsIndices[0] = 0 is obtained, and the first set is iteratively searched. There is no match. Therefore
+ * it is added to  queue 0 and the tag is updated.
+ * When a flow hash of 20 arrives, the outerHash corresponding to 20 is 16, and m_flowIndices[16] wasn’t previously allotted, a new set of eight queues are created, 
+ * and m_flowsIndices[16] is set to be 8 (since there are queues 0-7 previously set). After creating eight queues 8-15, 
+ * insert the packet into the first queue in this set.
  */
 class FqCoDelQueueDiscSetLinearProbing : public TestCase
 {
@@ -751,7 +759,7 @@ FqCoDelQueueDiscCollision::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hd
 void
 FqCoDelQueueDiscCollision::DoRun (void)
 {
-  Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("SetAssociativity", BooleanValue (false));
+  Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("SetAssociativity", BooleanValue (true));
   queueDisc->SetQuantum (90);
   queueDisc->Initialize ();
 

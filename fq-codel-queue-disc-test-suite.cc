@@ -606,7 +606,15 @@ FqCoDelQueueDiscUDPFlowsSeparation::DoRun (void)
 
 /**
  * This class tests Linear probing capability, collision response, and set creation capability of SetAssociative Hashing in fqCodel
- * SetAssociative hash is 
+ * SetAssociative hash.We modified DoClassify and CheckProtocol so that we could control the hash returned for each packet
+ * We use flow hashes ranging from 0 to 7. These must go into different queues in the same set. The set number is obtained by m_flowsIndices[0] which is 0.
+ * When a new packet comes in with flow 1024. Since 1024 % 1024 = 0, m_flowsIndices[0] = 0 is obtained, and the first set is iteratively searched. 
+ * The packet is added to queue 0 since the tag of the queues in the set don't match with the hash of the flow and the tag of the queue is updated.
+ * A packet with hash 1025 arrives. Since 1025 % 1024 = 1, m_flowsIndices[0] = 0 is obtained, and the first set is iteratively searched. There is no match. Therefore
+ * it is added to  queue 0 and the tag is updated.
+ * When a flow hash of 20 arrives, the outerHash corresponding to 20 is 16, and m_flowIndices[16] wasn’t previously allotted, a new set of eight queues are created, 
+ * and m_flowsIndices[16] is set to be 8 (since there are queues 0-7 previously set). After creating eight queues 8-15, 
+ * insert the packet into the first queue in this set.
  */
 class FqCoDelQueueDiscSetLinearProbing : public TestCase
 {
@@ -717,28 +725,28 @@ FqCoDelQueueDiscSetLinearProbing::DoRun (void)
 }
 
 
-class FqCoDelQueueDiscCollison : public TestCase
+class FqCoDelQueueDiscCollision : public TestCase
 {
 public:
-  FqCoDelQueueDiscCollison ();
-  virtual ~FqCoDelQueueDiscCollison ();
+  FqCoDelQueueDiscCollision ();
+  virtual ~FqCoDelQueueDiscCollision ();
 
 private:
   virtual void DoRun (void);
   void AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr);
 };
 
-FqCoDelQueueDiscCollison::FqCoDelQueueDiscCollison ()
+FqCoDelQueueDiscCollision::FqCoDelQueueDiscCollision ()
     : TestCase ("Test credits and flows status")
 {
 }
 
-FqCoDelQueueDiscCollison::~FqCoDelQueueDiscCollison ()
+FqCoDelQueueDiscCollision::~FqCoDelQueueDiscCollision ()
 {
 }
 
 void
-FqCoDelQueueDiscCollison::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr)
+FqCoDelQueueDiscCollision::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr)
 {
   Ptr<Packet> p = Create<Packet> (100);
   Address dest;
@@ -749,7 +757,7 @@ FqCoDelQueueDiscCollison::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr
 
 
 void
-FqCoDelQueueDiscCollison::DoRun (void)
+FqCoDelQueueDiscCollision::DoRun (void)
 {
   Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("SetAssociativity", BooleanValue (true));
   queueDisc->SetQuantum (90);
@@ -765,39 +773,36 @@ FqCoDelQueueDiscCollison::DoRun (void)
   hdr.SetProtocol (7);
   // Add packets from the flow
   int i = 0;
-  while(i < 1000){
-      std::ifstream in("file.txt");
-
+  std::ifstream in("hashvalues.txt");
     if(!in) {
       std::cout << "Cannot open input file.\n";
-      return 1;
     }
-
+  while(1){
     char str[255];
-
-    while(in) {
-      std::in.getline(str, 255);  // delim defaults to '\n'
-      if(in) std::cout << str << std::endl;
-    }
-
-    std::in.close();
-    hash = ;
-    unsigned int ui = static_cast<unsigned int>(std::stoul(std::string{"42"}));
+    in.getline(str, 255);  // delim defaults to '\n'
+      // if(in) std::cout << str << std::endl;
+    unsigned int ui = static_cast<unsigned int>(std::stoul(std::string{str}));
+    hash = ui;
+    // std::cout<<"Hash"<<ui<<"\n";
     AddPacket (queueDisc, hdr);
+    i++;
+    
+    
 
   }
+  in.close();
 
   // Add packets from the flow but with a different hash than the ones already situated
   // in first queue of set 1. This should go to the first queue of set 1. 
-  hash = 1025;
-  AddPacket (queueDisc, hdr);
-  NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (0)->GetQueueDisc ()->GetNPackets (), 3,
-                         "unexpected number of packets in the first flow of set one");
-  // Add packets from the flow with hash that falls into a different set
-  hash = 10;
-  AddPacket (queueDisc, hdr);
-  NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (8)->GetQueueDisc ()->GetNPackets (), 1,
-                         "unexpected number of packets in the first flow of set two");
+  // hash = 1025;
+  // AddPacket (queueDisc, hdr);
+  // NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (0)->GetQueueDisc ()->GetNPackets (), 3,
+  //                        "unexpected number of packets in the first flow of set one");
+  // // Add packets from the flow with hash that falls into a different set
+  // hash = 10;
+  // AddPacket (queueDisc, hdr);
+  // NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (8)->GetQueueDisc ()->GetNPackets (), 1,
+  //                        "unexpected number of packets in the first flow of set two");
 
   // Ptr<FqCoDelFlow> flow1 = StaticCast<FqCoDelFlow> (queueDisc->GetQueueDiscClass (0));
   // NS_TEST_ASSERT_MSG_EQ (flow1->GetDeficit (), static_cast<int32_t> (queueDisc->GetQuantum ()),
@@ -815,13 +820,14 @@ public:
 
 FqCoDelQueueDiscTestSuite::FqCoDelQueueDiscTestSuite () : TestSuite ("fq-codel-queue-disc", UNIT)
 {
-  AddTestCase (new FqCoDelQueueDiscNoSuitableFilter, TestCase::QUICK);
-  AddTestCase (new FqCoDelQueueDiscIPFlowsSeparationAndPacketLimit, TestCase::QUICK);
-  AddTestCase (new FqCoDelQueueDiscDeficit, TestCase::QUICK);
-  AddTestCase (new FqCoDelQueueDiscTCPFlowsSeparation, TestCase::QUICK);
-  AddTestCase (new FqCoDelQueueDiscUDPFlowsSeparation, TestCase::QUICK);
-  AddTestCase (new FqCoDelQueueDiscSetLinearProbing, TestCase::QUICK);
-  AddTestCase (new FqCoDelQueueDiscCollison, TestCase::QUICK);
+  // AddTestCase (new FqCoDelQueueDiscNoSuitableFilter, TestCase::QUICK);
+  // AddTestCase (new FqCoDelQueueDiscIPFlowsSeparationAndPacketLimit, TestCase::QUICK);
+  // AddTestCase (new FqCoDelQueueDiscDeficit, TestCase::QUICK);
+  // AddTestCase (new FqCoDelQueueDiscTCPFlowsSeparation, TestCase::QUICK);
+  // AddTestCase (new FqCoDelQueueDiscUDPFlowsSeparation, TestCase::QUICK);
+  // AddTestCase (new FqCoDelQueueDiscSetLinearProbing, TestCase::QUICK);
+  AddTestCase (new FqCoDelQueueDiscCollision, TestCase::QUICK);
 }
 
 static FqCoDelQueueDiscTestSuite fqCoDelQueueDiscTestSuite;
+
