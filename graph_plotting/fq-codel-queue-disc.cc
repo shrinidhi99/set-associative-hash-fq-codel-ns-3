@@ -278,7 +278,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
             {
               flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
               flow->GetQueueDisc ()->Enqueue (item);
-              n_collisions+=8;
+              n_collisions++;
               n_flows++;
               tags[outerHash + i] = flowHash;
               // NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
