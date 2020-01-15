@@ -261,6 +261,9 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
                 {
                   if (flow->GetStatus () == FqCoDelFlow::INACTIVE)
                     {
+                      if(i == m_flowsIndices[outerHash] + 8 - 1){
+                      	filled_set++;
+                      }
                       flow->SetStatus (FqCoDelFlow::NEW_FLOW);
                       flow->SetDeficit (m_quantum);
                       m_newFlows.push_back (flow);
@@ -292,7 +295,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
               // std::cout << "Should be filled" << filled_sets[outerHash/8] << outerHash << outerHash/8 << "\n";
               if (filled_sets[outerHash/8]!=1){
                 filled_sets[outerHash/8] = 1; 
-                filled_set++;
+                // filled_set++;
               }
               if(flowSet.find(flowHash)==flowSet.end()){
               	n_flows++;
