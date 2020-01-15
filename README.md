@@ -47,4 +47,7 @@ NS_LOG="FqCoDelQueueDisc" ./test.py -s fq-codel-queue-disc --text=results
 NS_LOG="FqCoDelQueueDisc" ./waf --run "test-runner --suite=fq-codel-queue-disc"
 
 NS_LOG="FqCoDelQueueDisc:FqCoDelQueueDisc2:PacketFilter:QueueDisc" ./waf --run "test-runner --suite=fq-codel-queue-disc"
+
+NS_LOG="FqCoDelQueueDisc" ./waf --run "test-runner --suite=fq-codel-queue-disc" > data26
+
 ```
