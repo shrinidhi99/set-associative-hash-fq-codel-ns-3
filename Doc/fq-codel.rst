@@ -134,15 +134,19 @@ or::
 
   $ NS_LOG="FqCoDelQueueDisc" ./waf --run "test-runner --suite=fq-codel-queue-disc"
 
+The SetAssociative Hash is tested by generating a probability collision graph. This graph is then overlapped with the theoretical graph provided in the original CAKE Paper https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8475045 . The exactness of the theoretical graph and the generated graph was assumed to be a proof of correctness. The generated graph is linked below
 
 
-The SetAssociative Hash is tested by generating a probability collision graph. This graph is then overlapped with the theoretical graph provided in the original CAKE Paper https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8475045 . The exactness of the theoretical graph and the generated graph was assumed to be a proof of correctness. The generated graph is linked below 
   .. image:: figures/collision_prob.png
   :alt: Generated Collision Probability Graph
 
+
 The overlapped graph is also linked below
-  .. image:: figures/overlapped.png
-  :alt: Overlapped Image with the graph from CAKE paper
+
+
+.. image:: figures/overlapped.png
+  
+
 
 The data for the graph is generated in the FqCoDelQueueDiscCollision test and its accompanying modified fq-codel-queue-disc.cc. The FqCoDelQueueDiscCollision takes as input hash values which are pre generated using python and are located in the hash folder. The test will output collision probability for the either the set associative hash or traditional hash depending on which is enabled. 30 such trials were conducted taking as input 30 different hash data sets and then the average was calculated through use of spreadsheet. The averages of both were calculated and the graph was plotted using spreadsheet tools. The data can be found set_associative_hash.ods file located in the same directory. 
 
