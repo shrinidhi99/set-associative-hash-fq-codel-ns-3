@@ -137,14 +137,14 @@ or::
 The SetAssociative Hash is tested by generating a probability collision graph. This graph is then overlapped with the theoretical graph provided in the original CAKE Paper https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=8475045 . The exactness of the theoretical graph and the generated graph was assumed to be a proof of correctness. The generated graph is linked below
 
 
-  .. image:: figures/collision_prob.png
+  .. image:: figures/collision_prob.jpeg
   :alt: Generated Collision Probability Graph
 
 
 The overlapped graph is also linked below
 
 
-  .. image:: figures/overlapped.png
+  .. image:: figures/overlapped.jpeg
   :alt: Overlapped Image with the graph from CAKE paper
   
 
