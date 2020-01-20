@@ -33,17 +33,19 @@ uint32_t tags[1024];
 
 NS_OBJECT_ENSURE_REGISTERED (FqCoDelFlow);
 
-TypeId
-FqCoDelFlow::GetTypeId (void)
+TypeId FqCoDelFlow::GetTypeId (void)
 {
   static TypeId tid = TypeId ("ns3::FqCoDelFlow")
-                          .SetParent<QueueDiscClass> ()
-                          .SetGroupName ("TrafficControl")
-                          .AddConstructor<FqCoDelFlow> ();
+    .SetParent<QueueDiscClass> ()
+    .SetGroupName ("TrafficControl")
+    .AddConstructor<FqCoDelFlow> ()
+  ;
   return tid;
 }
 
-FqCoDelFlow::FqCoDelFlow () : m_deficit (0), m_status (INACTIVE)
+FqCoDelFlow::FqCoDelFlow ()
+  : m_deficit (0),
+    m_status (INACTIVE)
 {
   NS_LOG_FUNCTION (this);
 }
@@ -88,47 +90,56 @@ FqCoDelFlow::GetStatus (void) const
   return m_status;
 }
 
+
 NS_OBJECT_ENSURE_REGISTERED (FqCoDelQueueDisc);
 
-TypeId
-FqCoDelQueueDisc::GetTypeId (void)
+TypeId FqCoDelQueueDisc::GetTypeId (void)
 {
-  static TypeId tid =
-      TypeId ("ns3::FqCoDelQueueDisc")
-          .SetParent<QueueDisc> ()
-          .SetGroupName ("TrafficControl")
-          .AddConstructor<FqCoDelQueueDisc> ()
-          .AddAttribute ("Interval", "The CoDel algorithm interval for each FQCoDel queue",
-                         StringValue ("100ms"), MakeStringAccessor (&FqCoDelQueueDisc::m_interval),
-                         MakeStringChecker ())
-          .AddAttribute ("Target", "The CoDel algorithm target queue delay for each FQCoDel queue",
-                         StringValue ("5ms"), MakeStringAccessor (&FqCoDelQueueDisc::m_target),
-                         MakeStringChecker ())
-          .AddAttribute ("MaxSize", "The maximum number of packets accepted by this queue disc",
-                         QueueSizeValue (QueueSize ("10240p")),
-                         MakeQueueSizeAccessor (&QueueDisc::SetMaxSize, &QueueDisc::GetMaxSize),
-                         MakeQueueSizeChecker ())
-          .AddAttribute ("Flows",
-                         "The number of queues into which the incoming packets are classified",
-                         UintegerValue (1024), MakeUintegerAccessor (&FqCoDelQueueDisc::m_flows),
-                         MakeUintegerChecker<uint32_t> ())
-          .AddAttribute ("DropBatchSize", "The maximum number of packets dropped from the fat flow",
-                         UintegerValue (64),
-                         MakeUintegerAccessor (&FqCoDelQueueDisc::m_dropBatchSize),
-                         MakeUintegerChecker<uint32_t> ())
-          .AddAttribute (
-              "Perturbation",
-              "The salt used as an additional input to the hash function used to classify packets",
-              UintegerValue (0), MakeUintegerAccessor (&FqCoDelQueueDisc::m_perturbation),
-              MakeUintegerChecker<uint32_t> ())
-          .AddAttribute (
+  static TypeId tid = TypeId ("ns3::FqCoDelQueueDisc")
+    .SetParent<QueueDisc> ()
+    .SetGroupName ("TrafficControl")
+    .AddConstructor<FqCoDelQueueDisc> ()
+    .AddAttribute ("Interval",
+                   "The CoDel algorithm interval for each FQCoDel queue",
+                   StringValue ("100ms"),
+                   MakeStringAccessor (&FqCoDelQueueDisc::m_interval),
+                   MakeStringChecker ())
+    .AddAttribute ("Target",
+                   "The CoDel algorithm target queue delay for each FQCoDel queue",
+                   StringValue ("5ms"),
+                   MakeStringAccessor (&FqCoDelQueueDisc::m_target),
+                   MakeStringChecker ())
+    .AddAttribute ("MaxSize",
+                   "The maximum number of packets accepted by this queue disc",
+                   QueueSizeValue (QueueSize ("10240p")),
+                   MakeQueueSizeAccessor (&QueueDisc::SetMaxSize,
+                                          &QueueDisc::GetMaxSize),
+                   MakeQueueSizeChecker ())
+    .AddAttribute ("Flows",
+                   "The number of queues into which the incoming packets are classified",
+                   UintegerValue (1024),
+                   MakeUintegerAccessor (&FqCoDelQueueDisc::m_flows),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("DropBatchSize",
+                   "The maximum number of packets dropped from the fat flow",
+                   UintegerValue (64),
+                   MakeUintegerAccessor (&FqCoDelQueueDisc::m_dropBatchSize),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("Perturbation",
+                   "The salt used as an additional input to the hash function used to classify packets",
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&FqCoDelQueueDisc::m_perturbation),
+                   MakeUintegerChecker<uint32_t> ())
+     .AddAttribute (
               "SetAssociativity", "Variable to use setassociativity hash", BooleanValue (false),
               MakeBooleanAccessor (&FqCoDelQueueDisc::m_setAssociativity), MakeBooleanChecker ());
+  ;
   return tid;
 }
 
 FqCoDelQueueDisc::FqCoDelQueueDisc ()
-    : QueueDisc (QueueDiscSizePolicy::MULTIPLE_QUEUES, QueueSizeUnit::PACKETS), m_quantum (0)
+  : QueueDisc (QueueDiscSizePolicy::MULTIPLE_QUEUES, QueueSizeUnit::PACKETS),
+    m_quantum (0)
 {
   NS_LOG_FUNCTION (this);
 }
@@ -155,16 +166,15 @@ bool
 FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
   NS_LOG_FUNCTION (this << item);
-
   if (m_setAssociativity)
     {
       uint32_t h = 0;
       uint32_t innerHash, outerHash;
       uint32_t flowHash;
       uint32_t set_ways = 8;
+
       if (GetNPacketFilters () == 0)
         {
-          NS_LOG_DEBUG("InsideFirstIF");
           flowHash = item->Hash (m_perturbation);
           h = (flowHash % m_flows);
           innerHash = h % set_ways;
@@ -177,7 +187,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 
           if (ret != PacketFilter::PF_NO_MATCH)
             {
-              NS_LOG_DEBUG("InsideIF");
               flowHash = ret;
               h = ret % m_flows;
               innerHash = h % set_ways;
@@ -185,7 +194,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
             }
           else
             {
-              NS_LOG_DEBUG("InsideElse");
               NS_LOG_ERROR ("No filter has been able to classify this packet, drop it.");
               DropBeforeEnqueue (item, UNCLASSIFIED_DROP);
               return false;
@@ -195,8 +203,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
       Ptr<FqCoDelFlow> flow;
       if (m_flowsIndices.find (outerHash) == m_flowsIndices.end ())
         {
-          // NS_LOG_DEBUG ("Creating a new flow queue with index " << h << "; flow index "
-          //                                                    << m_flowsIndices[outerHash] << " index of queue " << i - m_flowsIndices[outerHash]);
           for (uint32_t i = 0; i < 8; i++)
             {
               flow = m_flowFactory.Create<FqCoDelFlow> ();
@@ -213,8 +219,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           tags[outerHash] = flowHash;
           flow->GetQueueDisc ()->Enqueue (item);
 
-          NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-                                                             << m_flowsIndices[outerHash] << " index of queue " << 0);
           if (GetCurrentSize () > GetMaxSize ())
             {
               FqCoDelDrop ();
@@ -226,7 +230,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           bool flag = false;
           for (i = m_flowsIndices[outerHash]; i < m_flowsIndices[outerHash] + 8; i++)
             {
-              // NS_LOG_DEBUG ("i inside " << i << " flowHash " << flowHash << " something " <<tags[outerHash + i - m_flowsIndices[outerHash]]);
               flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (i));
 
               if (tags[outerHash + i - m_flowsIndices[outerHash]] == flowHash ||
@@ -239,10 +242,8 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
                       m_newFlows.push_back (flow);
                     }
                   flow->GetQueueDisc ()->Enqueue (item);
-                  tags[outerHash + i] = flowHash;
+                  tags[outerHash + i - m_flowsIndices[outerHash]] = flowHash;
                   flag = true;
-                  NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-                                                             << m_flowsIndices[outerHash] << " index of queue " << i - m_flowsIndices[outerHash]);
 
                   if (GetCurrentSize () > GetMaxSize ())
                     {
@@ -255,79 +256,76 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           if (flag == false)
             {
               flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
-
               flow->GetQueueDisc ()->Enqueue (item);
-              tags[outerHash + i] = flowHash;
-              NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index "
-                                                         << m_flowsIndices[outerHash]);
+              tags[outerHash] = flowHash;
               if (GetCurrentSize () > GetMaxSize ())
                 {
                   FqCoDelDrop ();
                 }
             }
         }
+    } else {
+
+
+
+  uint32_t h = 0;
+
+  if (GetNPacketFilters () == 0)
+    {
+      h = item->Hash (m_perturbation) % m_flows;
     }
   else
     {
-      uint32_t h = 0;
+      int32_t ret = Classify (item);
 
-      if (GetNPacketFilters () == 0)
+      if (ret != PacketFilter::PF_NO_MATCH)
         {
-          h = item->Hash (m_perturbation) % m_flows;
+          h = ret % m_flows;
         }
       else
         {
-          int32_t ret = Classify (item);
-          NS_LOG_DEBUG ("DoClassify " << ret);
-
-          if (ret != PacketFilter::PF_NO_MATCH)
-            {
-              h = ret % m_flows;
-              NS_LOG_DEBUG ("Inside IF PF_NO_MATCH " << h);
-            }
-          else
-            {
-              NS_LOG_ERROR ("No filter has been able to classify this packet, drop it.");
-              DropBeforeEnqueue (item, UNCLASSIFIED_DROP);
-              return false;
-            }
-        }
-
-      Ptr<FqCoDelFlow> flow;
-      if (m_flowsIndices.find (h) == m_flowsIndices.end ())
-        {
-          NS_LOG_DEBUG ("Creating a new flow queue with index " << h);
-          flow = m_flowFactory.Create<FqCoDelFlow> ();
-          Ptr<QueueDisc> qd = m_queueDiscFactory.Create<QueueDisc> ();
-          qd->Initialize ();
-          flow->SetQueueDisc (qd);
-          AddQueueDiscClass (flow);
-
-          m_flowsIndices[h] = GetNQueueDiscClasses () - 1;
-        }
-      else
-        {
-          flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[h]));
-        }
-
-      if (flow->GetStatus () == FqCoDelFlow::INACTIVE)
-        {
-          flow->SetStatus (FqCoDelFlow::NEW_FLOW);
-          flow->SetDeficit (m_quantum);
-          m_newFlows.push_back (flow);
-        }
-
-      flow->GetQueueDisc ()->Enqueue (item);
-
-      NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index " << m_flowsIndices[h]);
-
-      if (GetCurrentSize () > GetMaxSize ())
-        {
-          FqCoDelDrop ();
+          NS_LOG_ERROR ("No filter has been able to classify this packet, drop it.");
+          DropBeforeEnqueue (item, UNCLASSIFIED_DROP);
+          return false;
         }
     }
 
-  return true;
+  Ptr<FqCoDelFlow> flow;
+  if (m_flowsIndices.find (h) == m_flowsIndices.end ())
+    {
+      NS_LOG_DEBUG ("Creating a new flow queue with index " << h);
+      flow = m_flowFactory.Create<FqCoDelFlow> ();
+      Ptr<QueueDisc> qd = m_queueDiscFactory.Create<QueueDisc> ();
+      qd->Initialize ();
+      flow->SetQueueDisc (qd);
+      AddQueueDiscClass (flow);
+
+      m_flowsIndices[h] = GetNQueueDiscClasses () - 1;
+    }
+  else
+    {
+      flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[h]));
+    }
+
+  if (flow->GetStatus () == FqCoDelFlow::INACTIVE)
+    {
+      flow->SetStatus (FqCoDelFlow::NEW_FLOW);
+      flow->SetDeficit (m_quantum);
+      m_newFlows.push_back (flow);
+    }
+
+  flow->GetQueueDisc ()->Enqueue (item);
+
+  NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index " << m_flowsIndices[h]);
+
+  if (GetCurrentSize () > GetMaxSize ())
+    {
+      FqCoDelDrop ();
+    }
+
+  
+}
+return true;
 }
 
 Ptr<QueueDiscItem>
@@ -404,8 +402,7 @@ FqCoDelQueueDisc::DoDequeue (void)
         {
           NS_LOG_DEBUG ("Dequeued packet " << item->GetPacket ());
         }
-    }
-  while (item == 0);
+    } while (item == 0);
 
   flow->IncreaseDeficit (item->GetSize () * -1);
 
@@ -458,6 +455,7 @@ FqCoDelQueueDisc::InitializeParams (void)
   NS_LOG_FUNCTION (this);
 
   m_flowFactory.SetTypeId ("ns3::FqCoDelFlow");
+
   m_queueDiscFactory.SetTypeId ("ns3::CoDelQueueDisc");
   m_queueDiscFactory.Set ("MaxSize", QueueSizeValue (GetMaxSize ()));
   m_queueDiscFactory.Set ("Interval", StringValue (m_interval));
@@ -494,8 +492,7 @@ FqCoDelQueueDisc::FqCoDelDrop (void)
       item = qd->GetInternalQueue (0)->Dequeue ();
       DropAfterDequeue (item, OVERLIMIT_DROP);
       len += item->GetSize ();
-    }
-  while (++count < m_dropBatchSize && len < threshold);
+    } while (++count < m_dropBatchSize && len < threshold);
 
   return index;
 }

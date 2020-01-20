@@ -1,0 +1,235 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>FqCoDel queue disc &#8212; setassociativehash 1.0 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="fqcodel-queue-disc">
+<h1>FqCoDel queue disc<a class="headerlink" href="#fqcodel-queue-disc" title="Permalink to this headline">¶</a></h1>
+<p>This chapter describes the FqCoDel (<a class="reference internal" href="#hoe16" id="id1">[Hoe16]</a>) queue disc implementation in <a href="#id3"><span class="problematic" id="id4">|ns3|</span></a>.</p>
+<p>The FlowQueue-CoDel (FQ-CoDel) algorithm is a combined packet scheduler and
+Active Queue Management (AQM) algorithm developed as part of the
+bufferbloat-fighting community effort (<a class="reference internal" href="#buf16" id="id2">[Buf16]</a>).
+FqCoDel classifies incoming packets into different queues (by default, 1024
+queues are created), which are served according to a modified Deficit Round
+Robin (DRR) queue scheduler. Each queue is managed by the CoDel AQM algorithm.
+FqCoDel distinguishes between “new” queues (which don’t build up a standing
+queue) and “old” queues, that have queued enough data to be around for more
+than one iteration of the round-robin scheduler.</p>
+<p>FqCoDel is installed by default on single-queue NetDevices (such as PointToPoint,
+Csma and Simple). Also, on multi-queue devices (such as Wifi), the default root
+qdisc is Mq with as many FqCoDel child queue discs as the number of device queues.</p>
+<div class="section" id="model-description">
+<h2>Model Description<a class="headerlink" href="#model-description" title="Permalink to this headline">¶</a></h2>
+<p>The source code for the FqCoDel queue disc is located in the directory
+<code class="docutils literal"><span class="pre">src/traffic-control/model</span></code> and consists of 2 files <cite>fq-codel-queue-disc.h</cite>
+and <cite>fq-codel-queue-disc.cc</cite> defining a FqCoDelQueueDisc class and a helper
+FqCoDelFlow class. The code was ported to <a href="#id5"><span class="problematic" id="id6">|ns3|</span></a> based on Linux kernel code
+implemented by Eric Dumazet.
+Set Associative Hash is also based on Linux kenel Cake queue management code. Set associative hashing is used to reduce the number of hash collisions in comparison to choosing queues normally with a simple hash. For a given number of queues set associative hash has fewer collisions in comparison to traditional hash as long as the number of flows is fewer than the number of queues. Essentially, it makes the queue managment system more efficient.Our idea is a vital component of CAKE, which is another popular flow management algorithm that is also implemented in Linux, and is being tested for FqCodel. Furthermore, this module can be directly used with Cake when it is implemented. The only changes are in the DoEnqueue function and is detailed below.</p>
+<ul class="simple">
+<li>class <code class="xref cpp cpp-class docutils literal"><span class="pre">FqCoDelQueueDisc</span></code>: This class implements the main FqCoDel algorithm:<ul>
+<li><code class="docutils literal"><span class="pre">FqCoDelQueueDisc::DoEnqueue</span> <span class="pre">()</span></code>: If no packet filter has been configured, this routine calls the QueueDiscItem::Hash() method to classify the given packet into an appropriate queue. Otherwise, the configured filters are used to classify the packet. If the filters are unable to classify the packet, the packet is dropped. Otherwise, it is handed over to the CoDel algorithm for timestamping. Then, if the queue is not currently active (i.e., if it is not in either the list of new or the list of old queues), it is added to the end of the list of new queues, and its deficit is initiated to the configured quantum. Otherwise,  the queue is left in its current queue list. Finally, the total number of enqueued packets is compared with the configured limit, and if it is above this value (which can happen since a packet was just enqueued), packets are dropped from the head of the queue with the largest current byte count until the number of dropped packets reaches the configured drop batch size or the backlog of the queue has been halved. Note that this in most cases means that the packet that was just enqueued is not among the packets that get dropped, which may even be from a different queue.</li>
+<li><code class="docutils literal"><span class="pre">FqCoDelQueueDisc::DoEnqueue</span> <span class="pre">()</span></code>:SetAssociative DoEnqueue works differently for a set-associative hash. The following paragraph details the working of set-associative hash and its use. In this implementation, we use 8 way set associativity to divide the queues into groups of 8. Call this group of 8 queues a set. The way ns3 determines a queue is by taking the hash of the packet flow. We mainly use 2 hashes. FirstHash is generated from murmur3 by taking mod 1024. The second hash, which is the outerHash  = firstHash - first hash (mod 8), gives the first queue of the set which the flow should go into. Now, unlike Linux, there aren’t 1024 queues already existing in memory. So, when a new packet comes, queues are created as and when needed. However, to know the queue number, a map “m_flowsIndices” is created that maps the outer hash to the queue number.m_flowIndices plays an important role. Let’s say that flow hash modulo 1024 was 803. Linux would directly correspond this packet to the set containing queues 800-807 and put it in an empty queue.The existing implementation of fqCoDel in ns3 did this by creating the first queue, indexed at 0, and assigning m_flowsIndices[803] to 0, but in our case, we need to maintain set information. One way to do this is to create new queues in such a way that eight queues together can be considered as a set. In our implementation, we create eight queues altogether if the set wasn’t already present. We store the index of the first queue in this set, inside m_flowsIndices[800] (which is 0). Now, there are 8 queues created, among which seven of them are empty. 800 is the outer hash generated through the above equation.Logically outer hash is the closest multiple of 8 less than 803 ) . Now, say a packet with flow 805 comes in. Since it belongs to a set corresponding to 800, consequently has the same outer hash, and m_flowsIndices[800] is already set, our implementation now goes to queue 0, and searches iteratively in the next eight queues. Similar to Linux, we maintain a tags[] array, that allows us to determine the flow that is stored in a queue by mapping firstHash to the initial flowHash. To enable SetAssociativity, we also added a boolean attribute to the FqCoDel class named m_setAssociativity.When a collision occurs, if the packet is of a different flow than the ones in the set, we don’t consider creating new flows for the packet, since this approach might waste resources in the long run, or increasing the number of queues. A better approach is to enqueue the packet into the first queue. After adding the flow,  the corresponding tag for that queue is updated to the flow hash of the newly enqueued packet. An example is if the set is already full and a 9th flow enters, then it is queued into the first queue of the set, and the tag is updated to be the hash of the 9th flow. The situation highlighted is a guaranted collision and cannot be avoided without increasing the overall number of queues.</li>
+<li><code class="docutils literal"><span class="pre">FqCoDelQueueDisc::DoDequeue</span> <span class="pre">()</span></code>: The first task performed by this routine is selecting a queue from which to dequeue a packet. To this end, the scheduler first looks at the list of new queues; for the queue at the head of that list, if that queue has a negative deficit (i.e., it has already dequeued at least a quantum of bytes), it is given an additional amount of deficit, the queue is put onto the end of the list of old queues, and the routine selects the next queue and starts again. Otherwise, that queue is selected for dequeue. If the list of new queues is empty, the scheduler proceeds down the list of old queues in the same fashion (checking the deficit, and either selecting the queue for dequeuing, or increasing deficit and putting the queue back at the end of the list). After having selected a queue from which to dequeue a packet, the CoDel algorithm is invoked on that queue. As a result of this, one or more packets may be discarded from the head of the selected queue, before the packet that should be dequeued is returned (or nothing is returned if the queue is or becomes empty while being handled by the CoDel algorithm). Finally, if the CoDel algorithm does not return a packet, then the queue must be empty, and the scheduler does one of two things: if the queue selected for dequeue came from the list of new queues, it is moved to the end of the list of old queues.  If instead it came from the list of old queues, that queue is removed from the list, to be added back (as a new queue) the next time a packet for that queue arrives. Then (since no packet was available for dequeue), the whole dequeue process is restarted from the beginning. If, instead, the scheduler did get a packet back from the CoDel algorithm, it subtracts the size of the packet from the byte deficit for the selected queue and returns the packet as the result of the dequeue operation.</li>
+<li><code class="docutils literal"><span class="pre">FqCoDelQueueDisc::FqCoDelDrop</span> <span class="pre">()</span></code>: This routine is invoked by <code class="docutils literal"><span class="pre">FqCoDelQueueDisc::DoEnqueue()</span></code> to drop packets from the head of the queue with the largest current byte count. This routine keeps dropping packets until the number of dropped packets reaches the configured drop batch size or the backlog of the queue has been halved.</li>
+</ul>
+</li>
+<li>class <code class="xref cpp cpp-class docutils literal"><span class="pre">FqCoDelFlow</span></code>: This class implements a flow queue, by keeping its current status (whether it is in the list of new queues, in the list of old queues or inactive) and its current deficit.</li>
+</ul>
+<p>In Linux, by default, packet classification is done by hashing (using a Jenkins
+hash function) on the 5-tuple of IP protocol, and source and destination IP
+addresses and port numbers (if they exist), and taking the hash value modulo
+the number of queues. The hash is salted by modulo addition of a random value
+selected at initialisation time, to prevent possible DoS attacks if the hash
+is predictable ahead of time. Alternatively, any other packet filter can be
+configured.
+In <a href="#id7"><span class="problematic" id="id8">|ns3|</span></a>, packet classification is performed in the same way as in Linux.
+Neither internal queues nor classes can be configured for an FqCoDel
+queue disc.</p>
+<div class="section" id="references">
+<h3>References<a class="headerlink" href="#references" title="Permalink to this headline">¶</a></h3>
+<table class="docutils citation" frame="void" id="hoe16" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[Hoe16]</a></td><td><ol class="first last upperalpha simple" start="20">
+<li>Hoeiland-Joergensen, P. McKenney, D. Taht, J. Gettys and E. Dumazet, The FlowQueue-CoDel Packet Scheduler and Active Queue Management Algorithm, IETF draft.  Available online at <a class="reference external" href="https://tools.ietf.org/html/draft-ietf-aqm-fq-codel">https://tools.ietf.org/html/draft-ietf-aqm-fq-codel</a></li>
+</ol>
+</td></tr>
+</tbody>
+</table>
+<table class="docutils citation" frame="void" id="buf16" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[Buf16]</a></td><td>Bufferbloat.net.  Available online at <a class="reference external" href="http://www.bufferbloat.net/">http://www.bufferbloat.net/</a>.</td></tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="attributes">
+<h3>Attributes<a class="headerlink" href="#attributes" title="Permalink to this headline">¶</a></h3>
+<p>The key attributes that the FqCoDelQueue class holds include the following:</p>
+<ul class="simple">
+<li><code class="docutils literal"><span class="pre">Interval:</span></code> The interval parameter to be used on the CoDel queues. The default value is 100 ms.</li>
+<li><code class="docutils literal"><span class="pre">Target:</span></code> The target parameter to be used on the CoDel queues. The default value is 5 ms.</li>
+<li><code class="docutils literal"><span class="pre">MaxSize:</span></code> The limit on the maximum number of packets stored by FqCoDel.</li>
+<li><code class="docutils literal"><span class="pre">Flows:</span></code> The number of flow queues managed by FqCoDel.</li>
+<li><code class="docutils literal"><span class="pre">DropBatchSize:</span></code> The maximum number of packets dropped from the fat flow.</li>
+<li><code class="docutils literal"><span class="pre">Perturbation:</span></code> The salt used as an additional input to the hash function used to classify packets.</li>
+<li><code class="docutils literal"><span class="pre">SetAssociativity:</span></code> If this is true then set associative hash is used</li>
+</ul>
+<p>Perturbation is an optional configuration attribute and can be used to generate
+different hash outcomes for different inputs.  For instance, the tuples
+used as input to the hash may cause hash collisions (mapping to the same
+bucket) for a given set of inputs, but by changing the perturbation value,
+the same hash inputs now map to distinct buckets.</p>
+<p>Note that the quantum, i.e., the number of bytes each queue gets to dequeue on
+each round of the scheduling algorithm, is set by default to the MTU size of the
+device (at initialisation time). The <code class="docutils literal"><span class="pre">FqCoDelQueueDisc::SetQuantum</span> <span class="pre">()</span></code> method
+can be used (at any time) to configure a different value.</p>
+</div>
+<div class="section" id="examples">
+<h3>Examples<a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h3>
+<p>A typical usage pattern is to create a traffic control helper and to configure type
+and attributes of queue disc and filters from the helper. For example, FqCodel
+can be configured as follows:</p>
+<div class="highlight-cpp"><div class="highlight"><pre><span></span><span class="n">TrafficControlHelper</span> <span class="n">tch</span><span class="p">;</span>
+<span class="n">tch</span><span class="p">.</span><span class="n">SetRootQueueDisc</span> <span class="p">(</span><span class="s">&quot;ns3::FqCoDelQueueDisc&quot;</span><span class="p">,</span> <span class="s">&quot;DropBatchSize&quot;</span><span class="p">,</span> <span class="n">UintegerValue</span> <span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                                               <span class="s">&quot;Perturbation&quot;</span><span class="p">,</span> <span class="n">UintegerValue</span> <span class="p">(</span><span class="mi">256</span><span class="p">));</span>
+<span class="n">QueueDiscContainer</span> <span class="n">qdiscs</span> <span class="o">=</span> <span class="n">tch</span><span class="p">.</span><span class="n">Install</span> <span class="p">(</span><span class="n">devices</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="application-of-set-associative-hash">
+<h3>Application of Set Associative Hash<a class="headerlink" href="#application-of-set-associative-hash" title="Permalink to this headline">¶</a></h3>
+<p>Set Associative Hash is best used when the number of flows are fewer than the number of queues.
+As quoted in the FqCodel RFC “based on analytical equations for hash collision probabilities, for 100 flows,
+the probability of no collision is 90.78%…For a 4-way associative hash with the same number of total queues,
+the probability of no collisions for 100 flows is 99.93%, while for an 8-way associative hash, it is ~100%.”
+Furthermore, this module can be used when Cake is being implemented.</p>
+</div>
+</div>
+<div class="section" id="validation">
+<h2>Validation<a class="headerlink" href="#validation" title="Permalink to this headline">¶</a></h2>
+<p>The FqCoDel model is tested using <code class="xref cpp cpp-class docutils literal"><span class="pre">FqCoDelQueueDiscTestSuite</span></code> class defined in <cite>src/test/ns3tc/codel-queue-test-suite.cc</cite>.  The suite includes 5 test cases:</p>
+<ul class="simple">
+<li>Test 1: The first test checks that packets that cannot be classified by any available filter are dropped.</li>
+<li>Test 2: The second test checks that IPv4 packets having distinct destination addresses are enqueued into different flow queues. Also, it checks that packets are dropped from the fat flow in case the queue disc capacity is exceeded.</li>
+<li>Test 3: The third test checks the dequeue operation and the deficit round robin-based scheduler.</li>
+<li>Test 4: The fourth test checks that TCP packets with distinct port numbers are enqueued into different flow queues.</li>
+<li>Test 5: The fifth test checks that UDP packets with distinct port numbers are enqueued into different flow queues.</li>
+<li>Test 6: The sixth test checks the workings of set associative hash and its linear probing capabilities by using tcp packets with different hashes enqueued into different sets and queues.</li>
+</ul>
+<p>The test suite can be run using the following commands:</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>$ ./waf configure --enable-examples --enable-tests
+$ ./waf build
+$ ./test.py -s fq-codel-queue-disc
+</pre></div>
+</div>
+<p>or:</p>
+<div class="highlight-bash"><div class="highlight"><pre><span></span>$ <span class="nv">NS_LOG</span><span class="o">=</span><span class="s2">&quot;FqCoDelQueueDisc&quot;</span> ./waf --run <span class="s2">&quot;test-runner --suite=fq-codel-queue-disc&quot;</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt>The SetAssociative Hash is tested by generating a probability collision graph. This graph is then overlapped with the theoretical graph provided in the original CAKE Paper <a class="reference external" href="https://arxiv.org/pdf/1804.07617.pdf">https://arxiv.org/pdf/1804.07617.pdf</a> . The exactness of the theoretical graph and the gnerated graph was assumed to be a proof of correctness. The generated graph is linked below</dt>
+<dd><img alt="_images/collision_prob.png" class="first" src="_images/collision_prob.png" />
+<table class="last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">alt:</th><td class="field-body">Generated Collision Probability Graph</td>
+</tr>
+</tbody>
+</table>
+</dd>
+<dt>The overlapped graph is also linked below</dt>
+<dd><img alt="_images/overlapped.png" class="first" src="_images/overlapped.png" />
+<table class="last docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">alt:</th><td class="field-body">Overlapped Image with the graph from CAKE paper</td>
+</tr>
+</tbody>
+</table>
+</dd>
+</dl>
+<p>The data for the graph is generated in the FqCoDelQueueDiscCollision test and its accompanying modified fq-codel-queue-disc.cc. The FqCoDelQueueDiscCollision takes as input hash values which are pre generated using python and are located in the hash folder. The test will output collision probability for the either the set associative hash or traditional hash depending on which is enabled. 30 such trials were conducted taking as input 30 different hash data sets and then the average was calculated through use of spreadsheet. The averages of both were calculated and the graph was plotted using spreadsheet tools. The data can be found set_associative_hash.ods file located in the same directory.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Avakash , Deepak , Shrindhi.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.6.7</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+      |
+      <a href="_sources/fq-codel.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
