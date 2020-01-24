@@ -1,0 +1,235 @@
+38c38
+< int32_t hash;
+---
+> 
+56d55
+<   virtual bool CheckProtocol (Ptr<QueueDiscItem> item) const;
+81,87c80
+<   return hash;
+< }
+< 
+< bool
+< Ipv4TestPacketFilter::CheckProtocol (Ptr<QueueDiscItem> item) const
+< {
+<   return true;
+---
+>   return 0;
+119c112
+<   hash = -1;
+---
+> 
+523,733d515
+< /**
+<  * This class tests Linear probing capability, collision response, and set creation capability of SetAssociative Hashing in fqCodel
+<  * SetAssociative hash.We modified DoClassify and CheckProtocol so that we could control the hash returned for each packet
+<  * We use flow hashes ranging from 0 to 7. These must go into different queues in the same set. The set number is obtained by m_flowsIndices[0] which is 0.
+<  * When a new packet comes in with flow 1024. Since 1024 % 1024 = 0, m_flowsIndices[0] = 0 is obtained, and the first set is iteratively searched. 
+<  * The packet is added to queue 0 since the tag of the queues in the set don't match with the hash of the flow and the tag of the queue is updated.
+<  * A packet with hash 1025 arrives. Since 1025 % 1024 = 1, m_flowsIndices[0] = 0 is obtained, and the first set is iteratively searched. There is no match. Therefore
+<  * it is added to  queue 0 and the tag is updated.
+<  * When a flow hash of 20 arrives, the outerHash corresponding to 20 is 16, and m_flowIndices[16] wasn’t previously allotted, a new set of eight queues are created, 
+<  * and m_flowsIndices[16] is set to be 8 (since there are queues 0-7 previously set). After creating eight queues 8-15, 
+<  * insert the packet into the first queue in this set.
+<  */
+< class FqCoDelQueueDiscSetLinearProbing : public TestCase
+< {
+< public:
+<   FqCoDelQueueDiscSetLinearProbing ();
+<   virtual ~FqCoDelQueueDiscSetLinearProbing ();
+< 
+< private:
+<   virtual void DoRun (void);
+<   void AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr);
+< };
+< 
+< FqCoDelQueueDiscSetLinearProbing::FqCoDelQueueDiscSetLinearProbing ()
+<     : TestCase ("Test credits and flows status")
+< {
+< }
+< 
+< FqCoDelQueueDiscSetLinearProbing::~FqCoDelQueueDiscSetLinearProbing ()
+< {
+< }
+< 
+< void
+< FqCoDelQueueDiscSetLinearProbing::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr)
+< {
+<   Ptr<Packet> p = Create<Packet> (100);
+<   Address dest;
+<   Ptr<Ipv4QueueDiscItem> item = Create<Ipv4QueueDiscItem> (p, dest, 0, hdr);
+<   queue->Enqueue (item);
+< }
+< 
+< 
+< 
+< void
+< FqCoDelQueueDiscSetLinearProbing::DoRun (void)
+< {
+<   Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("SetAssociativity", BooleanValue (true));
+<   queueDisc->SetQuantum (90);
+<   queueDisc->Initialize ();
+< 
+<   Ptr<Ipv4TestPacketFilter> filter = CreateObject<Ipv4TestPacketFilter> ();
+<   queueDisc->AddPacketFilter (filter);
+< 
+<   Ipv4Header hdr;
+<   hdr.SetPayloadSize (100);
+<   hdr.SetSource (Ipv4Address ("10.10.1.1"));
+<   hdr.SetDestination (Ipv4Address ("10.10.1.2"));
+<   hdr.SetProtocol (7);
+<   // Add packets from the flow
+<   hash = 0;
+<   AddPacket (queueDisc, hdr);
+<   hash = 1;
+<   AddPacket (queueDisc, hdr);
+<   AddPacket (queueDisc, hdr);
+<   hash = 2;
+<   AddPacket (queueDisc, hdr);
+<   hash = 3;
+<   AddPacket (queueDisc, hdr);
+<   hash = 4;
+<   AddPacket (queueDisc, hdr);
+<   hash = 4;
+<   AddPacket (queueDisc, hdr);
+<   hash = 5;
+<   AddPacket (queueDisc, hdr);
+<   hash = 6;
+<   AddPacket (queueDisc, hdr);
+<   hash = 7;
+<   AddPacket (queueDisc, hdr);
+<   hash = 1024;
+<   AddPacket (queueDisc, hdr);
+< 
+<   NS_TEST_ASSERT_MSG_EQ (queueDisc->QueueDisc::GetNPackets (), 11,
+<                          "unexpected number of packets in the queue disc");
+<   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (0)->GetQueueDisc ()->GetNPackets (), 2,
+<                          "unexpected number of packets in the first flow queue of set one");
+<   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (1)->GetQueueDisc ()->GetNPackets (), 2,
+<                          "unexpected number of packets in the second flow queue of set one");
+<   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (2)->GetQueueDisc ()->GetNPackets (), 1,
+<                          "unexpected number of packets in the third flow queue of set one");
+<   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (3)->GetQueueDisc ()->GetNPackets (), 1,
+<                          "unexpected number of packets in the fourth flow queue of set one");
+<   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (4)->GetQueueDisc ()->GetNPackets (), 2,
+<                          "unexpected number of packets in the fifth flow queue of set one");
+<   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (5)->GetQueueDisc ()->GetNPackets (), 1,
+<                          "unexpected number of packets in the sixth flow queue of set one");
+<   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (6)->GetQueueDisc ()->GetNPackets (), 1,
+<                          "unexpected number of packets in the seventh flow queue of set one");
+<   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (7)->GetQueueDisc ()->GetNPackets (), 1,
+<                          "unexpected number of packets in the eigth flow queue of set one");
+< 
+<   // Add packets from the flow but with a different hash than the ones already situated
+<   // in first queue of set 1. This should go to the first queue of set 1. 
+<   hash = 1025;
+<   AddPacket (queueDisc, hdr);
+<   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (0)->GetQueueDisc ()->GetNPackets (), 3,
+<                          "unexpected number of packets in the first flow of set one");
+<   // Add packets from the flow with hash that falls into a different set
+<   hash = 10;
+<   AddPacket (queueDisc, hdr);
+<   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (8)->GetQueueDisc ()->GetNPackets (), 1,
+<                          "unexpected number of packets in the first flow of set two");
+< 
+<   // Ptr<FqCoDelFlow> flow1 = StaticCast<FqCoDelFlow> (queueDisc->GetQueueDiscClass (0));
+<   // NS_TEST_ASSERT_MSG_EQ (flow1->GetDeficit (), static_cast<int32_t> (queueDisc->GetQuantum ()),
+<   //                        "the deficit of the first flow must equal the quantum");
+<   // NS_TEST_ASSERT_MSG_EQ (flow1->GetStatus (), FqCoDelFlow::NEW_FLOW,
+<   //                        "the first flow must be in the list of new queues");
+<   Simulator::Destroy ();
+< }
+< 
+< 
+< class FqCoDelQueueDiscCollision : public TestCase
+< {
+< public:
+<   FqCoDelQueueDiscCollision ();
+<   virtual ~FqCoDelQueueDiscCollision ();
+< 
+< private:
+<   virtual void DoRun (void);
+<   void AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr);
+< };
+< 
+< FqCoDelQueueDiscCollision::FqCoDelQueueDiscCollision ()
+<     : TestCase ("Test credits and flows status")
+< {
+< }
+< 
+< FqCoDelQueueDiscCollision::~FqCoDelQueueDiscCollision ()
+< {
+< }
+< 
+< void
+< FqCoDelQueueDiscCollision::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr)
+< {
+<   Ptr<Packet> p = Create<Packet> (100);
+<   Address dest;
+<   Ptr<Ipv4QueueDiscItem> item = Create<Ipv4QueueDiscItem> (p, dest, 0, hdr);
+<   queue->Enqueue (item);
+< }
+< 
+< 
+< 
+< void
+< FqCoDelQueueDiscCollision::DoRun (void)
+< {
+<   Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("SetAssociativity", BooleanValue (false));
+<   queueDisc->SetQuantum (90);
+<   queueDisc->Initialize ();
+< 
+<   Ptr<Ipv4TestPacketFilter> filter = CreateObject<Ipv4TestPacketFilter> ();
+<   queueDisc->AddPacketFilter (filter);
+< 
+<   Ipv4Header hdr;
+<   hdr.SetPayloadSize (100);
+<   hdr.SetSource (Ipv4Address ("10.10.1.1"));
+<   hdr.SetDestination (Ipv4Address ("10.10.1.2"));
+<   hdr.SetProtocol (7);
+<   // Add packets from the flow
+<   int i = 0;
+<   std::ifstream in("hv_9.txt");
+<     if(!in) {
+<       std::cout << "Cannot open input file.\n";
+<     }
+< 
+<   while(1){
+<     char str[255];
+<     in.getline(str, 255);  // delim defaults to '\n'
+<       // if(in) std::cout << str << std::endl;
+<     unsigned int ui = static_cast<unsigned int>(std::stoul(std::string{str}));
+<     hash = ui;
+<     // std::cout<<"Hash"<<ui<<"\n";
+<     if(i >= 4000){
+<     	AddPacket (queueDisc, hdr);
+<     }
+<     i++;
+<     
+<     
+< 
+<   }
+<   in.close();
+< 
+<   // Add packets from the flow but with a different hash than the ones already situated
+<   // in first queue of set 1. This should go to the first queue of set 1. 
+<   // hash = 1025;
+<   // AddPacket (queueDisc, hdr);
+<   // NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (0)->GetQueueDisc ()->GetNPackets (), 3,
+<   //                        "unexpected number of packets in the first flow of set one");
+<   // // Add packets from the flow with hash that falls into a different set
+<   // hash = 10;
+<   // AddPacket (queueDisc, hdr);
+<   // NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (8)->GetQueueDisc ()->GetNPackets (), 1,
+<   //                        "unexpected number of packets in the first flow of set two");
+< 
+<   // Ptr<FqCoDelFlow> flow1 = StaticCast<FqCoDelFlow> (queueDisc->GetQueueDiscClass (0));
+<   // NS_TEST_ASSERT_MSG_EQ (flow1->GetDeficit (), static_cast<int32_t> (queueDisc->GetQuantum ()),
+<   //                        "the deficit of the first flow must equal the quantum");
+<   // NS_TEST_ASSERT_MSG_EQ (flow1->GetStatus (), FqCoDelFlow::NEW_FLOW,
+<   //                        "the first flow must be in the list of new queues");
+<   Simulator::Destroy ();
+< }
+< 
+748,749d529
+<   AddTestCase (new FqCoDelQueueDiscSetLinearProbing, TestCase::QUICK);
+<   // AddTestCase (new FqCoDelQueueDiscCollision, TestCase::QUICK);
