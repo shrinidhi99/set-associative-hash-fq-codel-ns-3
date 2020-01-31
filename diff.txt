@@ -1,0 +1,1081 @@
+diff --git a/scratch/dumbbell.cc b/scratch/dumbbell.cc
+new file mode 100644
+index 000000000..d83551593
+--- /dev/null
++++ b/scratch/dumbbell.cc
+@@ -0,0 +1,303 @@
++#include "ns3/core-module.h"
++#include "ns3/network-module.h"
++#include "ns3/internet-module.h"
++#include "ns3/flow-monitor-helper.h"
++#include "ns3/point-to-point-module.h"
++#include "ns3/applications-module.h"
++#include "ns3/traffic-control-module.h"
++//#include "ns3/flow-monitor-helper.h"
++
++using namespace ns3;
++
++NS_LOG_COMPONENT_DEFINE ("DumbbellTopology");
++
++
++std::string dir = "Plots/";
++
++static void
++tracer (uint32_t oldval, uint32_t newval)
++{
++  std::ofstream fPlotQueue (dir + "cwndTraces/A.plotme", std::ios::out | std::ios::app);
++  //fPlotQueue << Simulator::Now ().GetSeconds () << " " << newval/1446.0 << std::endl;
++  fPlotQueue << Simulator::Now ().GetSeconds () << " " << newval/536.0 << std::endl;
++  fPlotQueue.close ();
++}
++
++static void
++tracer1 (uint32_t oldval, uint32_t newval)
++{
++  std::ofstream fPlotQueue (dir + "cwndTraces/B.plotme", std::ios::out | std::ios::app);
++  //fPlotQueue << Simulator::Now ().GetSeconds () << " " << newval/1446.0 << std::endl;
++  fPlotQueue << Simulator::Now ().GetSeconds () << " " << newval/536.0 << std::endl;
++  fPlotQueue.close ();
++}
++
++static void
++tracer2 (uint32_t oldval, uint32_t newval)
++{
++  std::ofstream fPlotQueue (dir + "cwndTraces/C.plotme", std::ios::out | std::ios::app);
++  //fPlotQueue << Simulator::Now ().GetSeconds () << " " << newval/1446.0 << std::endl;
++  fPlotQueue << Simulator::Now ().GetSeconds () << " " << newval/536.0 << std::endl;
++  fPlotQueue.close ();
++
++}
++
++static void
++tracer3 (uint32_t oldval, uint32_t newval)
++{
++  std::ofstream fPlotQueue (dir + "cwndTraces/D.plotme", std::ios::out | std::ios::app);
++  //fPlotQueue << Simulator::Now ().GetSeconds () << " " << newval/1446.0 << std::endl;
++  fPlotQueue << Simulator::Now ().GetSeconds () << " " << newval/536.0 << std::endl;
++  fPlotQueue.close ();
++}
++
++static void
++tracer4 (uint32_t oldval, uint32_t newval)
++{
++  std::ofstream fPlotQueue (dir + "cwndTraces/E.plotme", std::ios::out | std::ios::app);
++  //fPlotQueue << Simulator::Now ().GetSeconds () << " " << newval/1446.0 << std::endl;
++  fPlotQueue << Simulator::Now ().GetSeconds () << " " << newval/536.0 << std::endl;
++  fPlotQueue.close ();
++}
++
++static void
++cwnd ()
++{
++  std::cout << "cwnd" << std::endl;
++  
++  Config::ConnectWithoutContext ("/NodeList/0/$ns3::TcpL4Protocol/SocketList/0/CongestionWindow", MakeCallback (&tracer));
++
++  //Config::ConnectWithoutContext ("/NodeList/0/$ns3::TcpL4Protocol/SocketList/0/CongestionWindow", MakeCallback (&tracer));
++  Config::ConnectWithoutContext ("/NodeList/1/$ns3::TcpL4Protocol/SocketList/0/CongestionWindow", MakeCallback (&tracer1));
++  Config::ConnectWithoutContext ("/NodeList/2/$ns3::TcpL4Protocol/SocketList/0/CongestionWindow", MakeCallback (&tracer2));
++  Config::ConnectWithoutContext ("/NodeList/3/$ns3::TcpL4Protocol/SocketList/0/CongestionWindow", MakeCallback (&tracer3));
++  Config::ConnectWithoutContext ("/NodeList/4/$ns3::TcpL4Protocol/SocketList/0/CongestionWindow", MakeCallback (&tracer4));
++}
++
++
++
++
++int 
++main (int argc, char  *argv[])
++{
++  char buffer[80];
++  time_t rawtime;
++  struct tm * timeinfo;
++  time (&rawtime);
++  timeinfo = localtime(&rawtime);
++
++  strftime(buffer,sizeof(buffer),"%d-%m-%Y-%I-%M-%S",timeinfo);
++  std::string currentTime (buffer);
++
++  CommandLine cmd;
++  cmd.Parse (argc, argv);
++  
++  Time::SetResolution (Time::NS);
++  LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
++  LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);
++  
++  NodeContainer nodes;
++  nodes.Create (12);
++ 
++  uint32_t meanPktSize = 500;
++  uint32_t maxBytes = 0;
++  //uint32_t MaxSize = 1000;
++  std::string redLinkDataRate = "1Mbps";
++  std::string redLinkDelay = "5ms";
++  //std::string EcnMode ="NoEcn";
++  std::string EcnMode ="ClassicEcn";
++  bool useEcn = true;
++  //bool enableFlowMonitor = true;
++  // RED params
++  NS_LOG_INFO ("Set RED params");
++  Config::SetDefault ("ns3::RedQueueDisc::MaxSize", QueueSizeValue (QueueSize ("25p")));
++
++  Config::SetDefault ("ns3::RedQueueDisc::MeanPktSize", UintegerValue (meanPktSize));
++  Config::SetDefault ("ns3::RedQueueDisc::Wait", BooleanValue (true));
++  Config::SetDefault ("ns3::RedQueueDisc::Gentle", BooleanValue (true));
++  Config::SetDefault ("ns3::RedQueueDisc::QW", DoubleValue (0.002));
++  Config::SetDefault ("ns3::RedQueueDisc::MinTh", DoubleValue (5));
++  Config::SetDefault ("ns3::RedQueueDisc::MaxTh", DoubleValue (15));
++  Config::SetDefault ("ns3::RedQueueDisc::UseEcn", BooleanValue (useEcn));
++  Config::SetDefault ("ns3::TcpSocketBase::EcnMode", StringValue (EcnMode));
++
++
++
++  PointToPointHelper pointToPoint, pointToPointRouter;
++  pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("500Mbps"));
++  pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
++
++  pointToPointRouter.SetDeviceAttribute ("DataRate", StringValue ("1Mbps"));
++  pointToPointRouter.SetChannelAttribute ("Delay", StringValue ("5ms"));
++
++  NetDeviceContainer Devn0n5,Devn1n5,Devn2n5,Devn3n5,Devn4n5,Devn5n6,Devn6n7,Devn6n8,Devn6n9,Devn6n10,Devn6n11,Devn6n12;
++  Devn0n5 = pointToPoint.Install (nodes.Get(0),nodes.Get(5));
++  Devn1n5 = pointToPoint.Install (nodes.Get(1),nodes.Get(5));
++  Devn2n5 = pointToPoint.Install (nodes.Get(2),nodes.Get(5));
++  Devn3n5 = pointToPoint.Install (nodes.Get(3),nodes.Get(5));
++  Devn4n5 = pointToPoint.Install (nodes.Get(4),nodes.Get(5));
++  Devn5n6 = pointToPointRouter.Install (nodes.Get(5),nodes.Get(6));
++  Devn6n7 = pointToPoint.Install (nodes.Get(6),nodes.Get(7));
++  Devn6n8 = pointToPoint.Install (nodes.Get(6),nodes.Get(8));
++  Devn6n9 = pointToPoint.Install (nodes.Get(6),nodes.Get(9));
++  Devn6n10 = pointToPoint.Install (nodes.Get(6),nodes.Get(10));
++  Devn6n11 = pointToPoint.Install (nodes.Get(6),nodes.Get(11));
++  //Devn6n12 = pointToPoint.Install (nodes.Get(6),nodes.Get(12))
++
++
++  InternetStackHelper stack;
++  stack.Install (nodes);
++
++  TrafficControlHelper tchRed;
++  /*tchRed.SetRootQueueDisc ("ns3::RedQueueDisc", "LinkBandwidth", StringValue (redLinkDataRate),
++                           "LinkDelay", StringValue (redLinkDelay));*/
++  tchRed.SetRootQueueDisc ("ns3::FifoQueueDisc");
++  //tchRed.AddPacketFilter("ns3::PacketFilter");
++  //tchRed.SetRootQueueDisc ("ns3::RedQueueDisc");
++  //tchRed.Uninstall(Devn5n6);
++  QueueDiscContainer queueDiscs;
++  queueDiscs = tchRed.Install (Devn5n6);
++
++
++
++  Ipv4AddressHelper address;
++  address.SetBase ("10.1.1.0", "255.255.255.0");
++
++  Ipv4InterfaceContainer interfaces = address.Assign (Devn0n5);
++
++  Ipv4AddressHelper address1;
++  address.SetBase ("10.1.2.0", "255.255.255.0");
++
++  Ipv4InterfaceContainer interfaces1 = address.Assign (Devn1n5);
++
++  Ipv4AddressHelper address2;
++  address.SetBase ("10.1.3.0", "255.255.255.0");
++
++  Ipv4InterfaceContainer interfaces2 = address.Assign (Devn2n5);
++  
++  Ipv4AddressHelper address3;
++  address.SetBase ("10.1.4.0", "255.255.255.0");
++
++  Ipv4InterfaceContainer interfaces3 = address.Assign (Devn3n5);
++
++  Ipv4AddressHelper address4;
++  address.SetBase ("10.1.5.0", "255.255.255.0");
++
++  Ipv4InterfaceContainer interfaces4 = address.Assign (Devn4n5);
++
++  Ipv4AddressHelper address5;
++  address.SetBase ("10.1.6.0", "255.255.255.0");
++
++  Ipv4InterfaceContainer interfaces5 = address.Assign (Devn5n6);
++  
++  Ipv4AddressHelper address6;
++  address.SetBase ("10.1.7.0", "255.255.255.0");
++
++  Ipv4InterfaceContainer interfaces6 = address.Assign (Devn6n7);
++
++  Ipv4AddressHelper address7;
++  address.SetBase ("10.1.8.0", "255.255.255.0");
++
++  Ipv4InterfaceContainer interfaces7 = address.Assign (Devn6n8);
++
++  Ipv4AddressHelper address8;
++  address.SetBase ("10.1.9.0", "255.255.255.0");
++
++  Ipv4InterfaceContainer interfaces8 = address.Assign (Devn6n9);
++
++  Ipv4AddressHelper address9;
++  address.SetBase ("10.1.100.0", "255.255.255.0");
++
++  Ipv4InterfaceContainer interfaces9 = address.Assign (Devn6n10);
++
++  Ipv4AddressHelper address10;
++  address.SetBase ("10.1.11.0", "255.255.255.0");
++
++  Ipv4InterfaceContainer interfaces10 = address.Assign (Devn6n11);
++
++ 
++
++  PacketSinkHelper sink("ns3::TcpSocketFactory",InetSocketAddress(Ipv4Address::GetAny(),50000));
++  ApplicationContainer sinkApp = sink.Install(nodes.Get(7));
++  PacketSinkHelper sink1("ns3::TcpSocketFactory",InetSocketAddress(Ipv4Address::GetAny(),50001));
++  ApplicationContainer sinkApp1 = sink1.Install(nodes.Get(8));
++  PacketSinkHelper sink2("ns3::TcpSocketFactory",InetSocketAddress(Ipv4Address::GetAny(),50002));
++  ApplicationContainer sinkApp2 = sink2.Install(nodes.Get(9));
++  PacketSinkHelper sink3("ns3::TcpSocketFactory",InetSocketAddress(Ipv4Address::GetAny(),50003));
++  ApplicationContainer sinkApp3 = sink3.Install(nodes.Get(10));
++  PacketSinkHelper sink4("ns3::TcpSocketFactory",InetSocketAddress(Ipv4Address::GetAny(),50004));
++  ApplicationContainer sinkApp4 = sink4.Install(nodes.Get(11));
++
++
++  BulkSendHelper source ("ns3::TcpSocketFactory",(InetSocketAddress(interfaces6.GetAddress(1),50000)));
++  source.SetAttribute ("MaxBytes", UintegerValue (maxBytes));
++  BulkSendHelper source1 ("ns3::TcpSocketFactory",(InetSocketAddress(interfaces7.GetAddress(1),50001)));
++  source1.SetAttribute ("MaxBytes", UintegerValue (maxBytes));
++  BulkSendHelper source2 ("ns3::TcpSocketFactory",(InetSocketAddress(interfaces8.GetAddress(1),50002)));
++  source2.SetAttribute ("MaxBytes", UintegerValue (maxBytes));
++  BulkSendHelper source3 ("ns3::TcpSocketFactory",(InetSocketAddress(interfaces9.GetAddress(1),50003)));
++  source3.SetAttribute ("MaxBytes", UintegerValue (maxBytes));
++  BulkSendHelper source4 ("ns3::TcpSocketFactory",(InetSocketAddress(interfaces10.GetAddress(1),50004)));
++  source4.SetAttribute ("MaxBytes", UintegerValue (maxBytes));
++  
++  
++  ApplicationContainer sourceApp = source.Install(nodes.Get(0));
++  ApplicationContainer sourceApp1 = source1.Install(nodes.Get(1));
++  ApplicationContainer sourceApp2 = source2.Install(nodes.Get(2));
++  ApplicationContainer sourceApp3 = source3.Install(nodes.Get(3));
++  ApplicationContainer sourceApp4 = source4.Install(nodes.Get(4));
++      
++   
++   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
++   
++  //pointToPoint.EnablePcapAll ("pcap",true);
++  
++  //node23.EnablePcapAll ();
++
++  sourceApp.Start(Seconds(0.0));
++  sourceApp.Stop(Seconds(100.0));
++  sourceApp1.Start(Seconds(0.0));
++  sourceApp1.Stop(Seconds(100.0));
++  sourceApp2.Start(Seconds(0.0));
++  sourceApp2.Stop(Seconds(100.0));
++  sourceApp3.Start(Seconds(0.0));
++  sourceApp3.Stop(Seconds(100.0));
++  sourceApp4.Start(Seconds(0.0));
++  sourceApp4.Stop(Seconds(100.0));
++
++
++  sinkApp.Start(Seconds(0.0));
++  sinkApp.Stop(Seconds(100.0));
++  sinkApp1.Start(Seconds(0.0));
++  sinkApp1.Stop(Seconds(100.0));
++  sinkApp2.Start(Seconds(0.0));
++  sinkApp2.Stop(Seconds(100.0));
++  sinkApp3.Start(Seconds(0.0));
++  sinkApp3.Stop(Seconds(100.0));
++  sinkApp4.Start(Seconds(0.0));
++  sinkApp4.Stop(Seconds(100.0));
++
++  dir += (currentTime + "/");
++  std::string dirToSave = "mkdir -p " + dir;
++  system (dirToSave.c_str ());
++  system ((dirToSave + "/pcap/").c_str ());
++  system ((dirToSave + "/cwndTraces/").c_str ());
++  system ((dirToSave + "/queueTraces/").c_str ());
++  pointToPoint.EnablePcapAll (dir + "pcap/N", true);
++  
++  Simulator::Schedule (Seconds (0.1), &cwnd);
++
++ 
++
++  Simulator::Stop(Seconds(100.0));
++  Simulator::Run();
++
++ 
++
++  QueueDisc::Stats st = queueDiscs.Get (0)->GetStats ();
++  std::cout << st << std::endl;
++  
++
++  Simulator::Destroy();
++  return 0;
++}
+diff --git a/src/internet/model/ipv4-queue-disc-item.cc b/src/internet/model/ipv4-queue-disc-item.cc
+index 4b9d4828c..e71a9922c 100644
+--- a/src/internet/model/ipv4-queue-disc-item.cc
++++ b/src/internet/model/ipv4-queue-disc-item.cc
+@@ -57,6 +57,14 @@ Ipv4QueueDiscItem::GetHeader (void) const
+   return m_header;
+ }
+ 
++SequenceNumber32
++Ipv4QueueDiscItem::GetAckSeqHeader (void)
++{
++  TcpHeader tcpHdr;
++  GetPacket ()->PeekHeader (tcpHdr);
++  return tcpHdr.GetAckNumber ();
++}
++
+ void Ipv4QueueDiscItem::AddHeader (void)
+ {
+   NS_LOG_FUNCTION (this);
+@@ -106,6 +114,19 @@ Ipv4QueueDiscItem::GetUint8Value (QueueItem::Uint8Values field, uint8_t& value)
+       value = m_header.GetTos ();
+       ret = true;
+       break;
++    case TCP_FLAGS:
++      uint8_t prot = m_header.GetProtocol ();
++      if (prot == 6)
++        {
++          TcpHeader tcpHdr;
++          GetPacket ()->PeekHeader (tcpHdr);
++          value = tcpHdr.GetFlags ();
++          ret = true;
++        }
++      else
++        {
++          ret = false;
++        }
+     }
+ 
+   return ret;
+@@ -166,4 +187,74 @@ Ipv4QueueDiscItem::Hash (uint32_t perturbation) const
+   return hash;
+ }
+ 
++uint16_t
++Ipv4QueueDiscItem::TcpSourcePort (void)
++{
++  TcpHeader tcpHdr;
++  GetPacket ()->PeekHeader (tcpHdr);
++  return tcpHdr.GetSourcePort ();
++}
++
++uint16_t
++Ipv4QueueDiscItem::TcpDestinationPort (void)
++{
++  TcpHeader tcpHdr;
++  GetPacket ()->PeekHeader (tcpHdr);
++  return tcpHdr.GetDestinationPort ();
++}
++
++Ipv4QueueDiscItem::SackList
++Ipv4QueueDiscItem::TcpGetSackList (void)
++{
++  TcpHeader tcpHdr;
++  GetPacket ()->PeekHeader (tcpHdr);
++  Ptr<const TcpOptionSack> s = DynamicCast<const TcpOptionSack> (tcpHdr.GetOption (TcpOption::SACK));
++  TcpOptionSack::SackList list = s->GetSackList ();
++  return list;
++}
++
++bool
++Ipv4QueueDiscItem::TcpGetTimestamp (uint32_t &tstamp,uint32_t &tsecr)
++{
++  TcpHeader tcpHdr;
++  GetPacket ()->PeekHeader (tcpHdr);
++  if (tcpHdr.HasOption (TcpOption::TS))
++    {
++      Ptr<const TcpOptionTS> ts = DynamicCast<const TcpOptionTS> (tcpHdr.GetOption (TcpOption::TS));
++      tstamp = ts->GetTimestamp ();
++      tsecr = ts->GetEcho ();
++      return true;
++    }
++  else
++    {
++      return false;
++    }
++}
++
++uint8_t
++Ipv4QueueDiscItem::GetL4Protocol (void)
++{
++  uint8_t prot = m_header.GetProtocol ();
++  return prot;
++}
++
++void
++Ipv4QueueDiscItem::GetSourceL3address (Ipv4Address &src)
++{
++  src = m_header.GetSource ();
++}
++
++void
++Ipv4QueueDiscItem::GetDestL3address (Ipv4Address &Dest)
++{
++  Dest = m_header.GetDestination ();
++}
++
++bool
++Ipv4QueueDiscItem::HasTcpOption (uint8_t kind)
++{
++  TcpHeader tcpHdr;
++  GetPacket ()->PeekHeader (tcpHdr);
++  return tcpHdr.HasOption (kind);
++}
+ } // namespace ns3
+diff --git a/src/internet/model/ipv4-queue-disc-item.h b/src/internet/model/ipv4-queue-disc-item.h
+index 52371a4b6..6f61921ed 100644
+--- a/src/internet/model/ipv4-queue-disc-item.h
++++ b/src/internet/model/ipv4-queue-disc-item.h
+@@ -22,6 +22,10 @@
+ #include "ns3/packet.h"
+ #include "ns3/queue-item.h"
+ #include "ipv4-header.h"
++#include "tcp-option-winscale.h"
++#include "tcp-option-ts.h"
++#include "tcp-option-sack-permitted.h"
++#include "tcp-option-sack.h"
+ 
+ namespace ns3 {
+ 
+@@ -33,7 +37,8 @@ namespace ns3 {
+  * Header and payload are kept separate to allow the queue disc to manipulate
+  * the header, which is added to the packet when the packet is dequeued.
+  */
+-class Ipv4QueueDiscItem : public QueueDiscItem {
++class Ipv4QueueDiscItem : public QueueDiscItem
++{
+ public:
+   /**
+    * \brief Create an IPv4 queue disc item containing an IPv4 packet.
+@@ -59,6 +64,9 @@ public:
+   /**
+    * \brief Add the header to the packet
+    */
++
++  SequenceNumber32 GetAckSeqHeader (void);
++
+   virtual void AddHeader (void);
+ 
+   /**
+@@ -92,8 +100,25 @@ public:
+    * \param perturbation hash perturbation value
+    * \return the hash of the packet's 5-tuple
+    */
++  typedef std::pair<SequenceNumber32, SequenceNumber32> SackBlock; //!< SACK block definition
++  typedef std::list<SackBlock> SackList;                           //!< SACK list definition
++
+   virtual uint32_t Hash (uint32_t perturbation) const;
+ 
++  virtual uint16_t TcpSourcePort (void);
++
++  virtual uint16_t TcpDestinationPort (void);
++
++  virtual SackList TcpGetSackList (void);
++
++  virtual bool TcpGetTimestamp (uint32_t &tstamp,uint32_t &tsecr);
++
++  virtual uint8_t GetL4Protocol (void);
++
++  virtual void GetSourceL3address (Ipv4Address &src);
++  virtual void GetDestL3address (Ipv4Address &Dest);
++  virtual bool HasTcpOption (uint8_t kind);
++
+ private:
+   /**
+    * \brief Default constructor
+diff --git a/src/internet/model/ipv6-queue-disc-item.cc b/src/internet/model/ipv6-queue-disc-item.cc
+index 3bc4cd9ff..428c1b5c8 100644
+--- a/src/internet/model/ipv6-queue-disc-item.cc
++++ b/src/internet/model/ipv6-queue-disc-item.cc
+@@ -105,6 +105,20 @@ Ipv6QueueDiscItem::GetUint8Value (QueueItem::Uint8Values field, uint8_t& value)
+       value = m_header.GetTrafficClass ();
+       ret = true;
+       break;
++    case TCP_FLAGS:
++      uint8_t prot = m_header.GetNextHeader ();
++      if (prot == 6)
++      {
++        TcpHeader tcpHdr;
++        GetPacket ()->PeekHeader (tcpHdr);
++        value = tcpHdr.GetFlags ();
++        ret = true;
++       }
++       else
++       {
++        ret = false;
++       }
++      break;
+     }
+ 
+   return ret;
+diff --git a/src/network/utils/queue-item.cc b/src/network/utils/queue-item.cc
+index 339c79d81..4ba73806a 100644
+--- a/src/network/utils/queue-item.cc
++++ b/src/network/utils/queue-item.cc
+@@ -21,6 +21,7 @@
+ #include "queue-item.h"
+ #include "ns3/packet.h"
+ #include "ns3/log.h"
++#include "ns3/tcp-header.h"
+ 
+ namespace ns3 {
+ 
+@@ -53,6 +54,13 @@ QueueItem::GetSize (void) const
+   return m_packet->GetSize ();
+ }
+ 
++SequenceNumber32
++QueueItem::GetAckSeqHeader (void)
++{
++  return SequenceNumber32 (0);
++}
++
++
+ bool
+ QueueItem::GetUint8Value (QueueItem::Uint8Values field, uint8_t& value) const
+ {
+@@ -63,7 +71,7 @@ QueueItem::GetUint8Value (QueueItem::Uint8Values field, uint8_t& value) const
+ void
+ QueueItem::Print (std::ostream& os) const
+ {
+-  os << GetPacket();
++  os << GetPacket ();
+ }
+ 
+ std::ostream & operator << (std::ostream &os, const QueueItem &item)
+@@ -72,6 +80,52 @@ std::ostream & operator << (std::ostream &os, const QueueItem &item)
+   return os;
+ }
+ 
++uint16_t
++QueueItem::TcpSourcePort (void)
++{
++  return 0;
++}
++
++uint16_t
++QueueItem::TcpDestinationPort (void)
++{
++  return 0;
++}
++
++QueueItem::SackList
++QueueItem::TcpGetSackList (void)
++{
++  QueueItem::SackList sack;
++  return sack;
++}
++
++bool
++QueueItem::TcpGetTimestamp (uint32_t &tstamp,uint32_t &tsecr)
++{
++  return false;
++}
++
++uint8_t
++QueueItem::GetL4Protocol (void)
++{
++  return 0;
++}
++
++void
++QueueItem::GetSourceL3address (Ipv4Address &src)
++{
++}
++
++void
++QueueItem::GetDestL3address (Ipv4Address &Dest)
++{
++}
++
++bool
++QueueItem::HasTcpOption (uint8_t kind)
++{
++  return false;
++}
+ 
+ QueueDiscItem::QueueDiscItem (Ptr<Packet> p, const Address& addr, uint16_t protocol)
+   : QueueItem (p),
+@@ -82,7 +136,7 @@ QueueDiscItem::QueueDiscItem (Ptr<Packet> p, const Address& addr, uint16_t proto
+   NS_LOG_FUNCTION (this << p << addr << protocol);
+ }
+ 
+-QueueDiscItem::~QueueDiscItem()
++QueueDiscItem::~QueueDiscItem ()
+ {
+   NS_LOG_FUNCTION (this);
+ }
+@@ -133,9 +187,9 @@ void
+ QueueDiscItem::Print (std::ostream& os) const
+ {
+   os << GetPacket () << " "
+-     << "Dst addr " << m_address << " "
+-     << "proto " << (uint16_t) m_protocol << " "
+-     << "txq " << (uint8_t) m_txq
++  << "Dst addr " << m_address << " "
++  << "proto " << (uint16_t) m_protocol << " "
++  << "txq " << (uint8_t) m_txq
+   ;
+ }
+ 
+@@ -146,4 +200,5 @@ QueueDiscItem::Hash (uint32_t perturbation) const
+   return 0;
+ }
+ 
++
+ } // namespace ns3
+diff --git a/src/network/utils/queue-item.h b/src/network/utils/queue-item.h
+index d22b03ba2..abf262f83 100644
+--- a/src/network/utils/queue-item.h
++++ b/src/network/utils/queue-item.h
+@@ -24,6 +24,9 @@
+ #include "ns3/simple-ref-count.h"
+ #include <ns3/address.h>
+ #include "ns3/nstime.h"
++#include "ns3/tcp-header.h"
++#include "ns3/udp-header.h"
++
+ 
+ namespace ns3 {
+ 
+@@ -52,6 +55,8 @@ public:
+    */
+   QueueItem (Ptr<Packet> p);
+ 
++  virtual SequenceNumber32  GetAckSeqHeader (void);
++
+   virtual ~QueueItem ();
+ 
+   /**
+@@ -74,9 +79,10 @@ public:
+    * \brief 1-byte fields of the packet whose value can be retrieved, if present
+    */
+   enum Uint8Values
+-    {
+-      IP_DSFIELD
+-    };
++  {
++    IP_DSFIELD,
++    TCP_FLAGS
++  };
+ 
+   /**
+    * \brief Retrieve the value of a given field from the packet, if present
+@@ -98,7 +104,22 @@ public:
+    *
+    * \param [in] item The queue item.
+    */
+-  typedef void (* TracedCallback) (Ptr<const QueueItem> item);
++  typedef void (*TracedCallback)(Ptr<const QueueItem> item);
++
++  virtual uint16_t TcpSourcePort (void);
++
++  virtual uint16_t TcpDestinationPort (void);
++
++
++  typedef std::pair<SequenceNumber32, SequenceNumber32> SackBlock; //!< SACK block definition
++  typedef std::list<SackBlock> SackList;                           //!< SACK list definition
++
++  virtual SackList TcpGetSackList (void);
++  virtual bool TcpGetTimestamp (uint32_t &tstamp,uint32_t &tsecr);
++  virtual uint8_t GetL4Protocol (void);
++  virtual void GetSourceL3address (Ipv4Address &src);
++  virtual void GetDestL3address (Ipv4Address &Dest);
++  virtual bool HasTcpOption (uint8_t kind);
+ 
+ private:
+   /**
+@@ -145,7 +166,8 @@ std::ostream& operator<< (std::ostream& os, const QueueItem &item);
+  * to additionally store the destination MAC address, the
+  * L3 protocol number and the transmission queue index,
+  */
+-class QueueDiscItem : public QueueItem {
++class QueueDiscItem : public QueueItem
++{
+ public:
+   /**
+    * \brief Create a queue disc item.
+diff --git a/src/network/utils/queue.h b/src/network/utils/queue.h
+index e8e168ef9..625f342a0 100644
+--- a/src/network/utils/queue.h
++++ b/src/network/utils/queue.h
+@@ -252,6 +252,7 @@ private:
+ template <typename Item>
+ class Queue : public QueueBase
+ {
++
+ public:
+   /**
+    * \brief Get the type ID.
+@@ -298,7 +299,7 @@ public:
+   /// Define ItemType as the type of the stored elements
+   typedef Item ItemType;
+ 
+-protected:
++public:
+ 
+   /// Const iterator.
+   typedef typename std::list<Ptr<Item> >::const_iterator ConstIterator;
+diff --git a/src/traffic-control/model/ack-filter.cc b/src/traffic-control/model/ack-filter.cc
+new file mode 100644
+index 000000000..51f137350
+--- /dev/null
++++ b/src/traffic-control/model/ack-filter.cc
+@@ -0,0 +1,260 @@
++#include "ns3/log.h"
++#include "ack-filter.h"
++#include "ns3/object-factory.h"
++#include "ns3/drop-tail-queue.h"
++#include "ns3/header.h"
++#include "ns3/ipv4-header.h"
++#include "ns3/tcp-header.h"
++#include "queue-disc.h"
++
++namespace ns3 {
++
++NS_LOG_COMPONENT_DEFINE ("AckFilter");
++
++NS_OBJECT_ENSURE_REGISTERED (AckFilter);
++
++TypeId AckFilter::GetTypeId (void)
++{
++  static TypeId tid = TypeId ("ns3::AckFilter")
++    .SetParent<Object> ()
++    .SetGroupName ("TrafficControl")
++    .AddConstructor<AckFilter> ();
++  return tid;
++}
++
++
++AckFilter::AckFilter ()
++{
++  NS_LOG_FUNCTION (this);
++}
++
++AckFilter::~AckFilter ()
++{
++  NS_LOG_FUNCTION (this);
++}
++
++int
++AckFilter::AckFilterSackCompare (Ptr<QueueDiscItem> item_a, Ptr<QueueDiscItem> item_b) const
++{
++  if (item_a->HasTcpOption (TcpOption::SACK) && !(item_b->HasTcpOption (TcpOption::SACK)))
++    {
++      return -1;
++    }
++  else if (!(item_a->HasTcpOption (TcpOption::SACK)) && (item_b->HasTcpOption (TcpOption::SACK)))
++    {
++      return 1;
++    }
++  else if (!(item_a->HasTcpOption (TcpOption::SACK)) && !(item_b->HasTcpOption (TcpOption::SACK)))
++    {
++      return 0;
++    }
++  typedef std::list<std::pair<SequenceNumber32,SequenceNumber32> > sack;
++  sack sack_a, sack_b;
++  sack_a = item_a->TcpGetSackList ();
++  sack_b = item_b->TcpGetSackList ();
++  SequenceNumber32 ack_seq_a = item_a->GetAckSeqHeader ();
++  uint32_t bytes_a = 0, bytes_b = 0;
++  while (true)
++    {
++      sack sack_temp = sack_b;
++      sack::iterator it_a = sack_a.begin ();
++      sack::iterator it_b = sack_b.begin ();
++      SequenceNumber32 start_a,end_a;
++      start_a = it_a->first;
++      end_a = it_a->second;
++      bool found = false;
++      bool first = true;
++
++      if (start_a < ack_seq_a)
++        {
++          return -1;
++        }
++      bytes_a += end_a - start_a;
++      while (true)
++        {
++          SequenceNumber32 start_b, end_b;
++          start_b = it_b->first;
++          end_b = it_b->second;
++          if (first)
++            {
++            }
++          bytes_b += end_b - start_b;
++          if (!(start_b > start_a) && !(end_b < end_a))
++            {
++              found = true;
++              if (!first)
++                {
++                  break;
++                }
++            }
++          it_b++;
++        }
++      if (!found)
++        {
++          return -1;
++        }
++      else
++        {
++          it_a++;
++          first = false;
++        }
++    }
++  return bytes_b > bytes_a ? 1 : 0;
++}
++
++
++bool
++AckFilter::AckFilterMayDrop (Ptr<QueueDiscItem> item, uint32_t tstamp,uint32_t tsecr) const
++{
++  uint8_t flags;
++  if ((((item->GetUint8Value (QueueItem::TCP_FLAGS,flags)) & uint32_t (0x0F3F0000)) != TcpHeader::ACK) || item->HasTcpOption (TcpOption::SACKPERMITTED) || item->HasTcpOption (TcpOption::WINSCALE) || item->HasTcpOption (TcpOption::UNKNOWN))
++    {
++      return false;
++    }
++  else if (item->HasTcpOption (TcpOption::TS))
++    {
++      uint32_t tstamp_check,tsecr_check;
++      item->TcpGetTimestamp (tstamp_check,tsecr_check);
++      if ((tstamp_check < tstamp) || (tsecr_check < tsecr))
++        {
++          return false;
++        }
++      else
++        {
++          return true;
++        }
++    }
++  else
++    {
++      return true;
++    }
++}
++
++void
++AckFilter::AckFilterMain (Ptr<Queue<QueueDiscItem>> Qu) const
++{
++  Ptr<Queue<QueueDiscItem> > queue =  Qu;
++  bool hastimestamp;
++  uint32_t tstamp, tsecr;
++  Ipv4Address src1,src2,dst1,dst2;
++  Ptr<QueueDiscItem> elig_ack = NULL, elig_ack_prev= NULL;
++  uint32_t elig_flags=0;
++  int num_found=0;
++  // No other possible ACKs to filter
++  if (*(queue->Tail ()) == *(queue->Head ()))
++    {
++      std::cout<<"here"<<std::endl;
++      return;
++    }
++    std::cout<<*(queue->Tail ())<<"  "<<(*(queue->Head ()))->GetL4Protocol ()<<std::endl;
++  Ptr<QueueDiscItem> tail = *(queue->Tail ());
++  std::cout<<"here"<<std::endl;
++  std::cout<<tail->GetL4Protocol ()<<std::endl;
++   
++  if (tail->GetL4Protocol () != 6)
++    {
++      std::cout<<tail->GetL4Protocol ()<<std::endl;
++      return;
++    }
++
++  hastimestamp = tail->TcpGetTimestamp (tstamp,tsecr);
++  std::cout << hastimestamp;
++  //the 'triggering' packet need only have the ACK flag set.
++  //also check that SYN is not set, as there won't be any previous ACKs.
++  uint8_t flags;
++  tail->GetUint8Value (QueueItem::TCP_FLAGS,flags);
++  if ((flags & (TcpHeader::SYN | TcpHeader::ACK)) != TcpHeader::ACK)
++    {
++      return;
++    }
++  auto prev = queue->Head ();
++
++  //Triggered ack is at tail of the queue we have already returned if it is the only
++  //packet in the flow. Loop through the rest of the queue looking for pure ack
++  //with the same 5-tuple as the triggered one
++  for (auto check = queue->Head (); check != queue->Tail (); prev = check,check++)
++    {
++      if ((*check)->GetL4Protocol () != 6 || ((*check)->TcpSourcePort () != tail->TcpSourcePort ()) || ((*check)->TcpDestinationPort () != tail->TcpDestinationPort ()))
++        {
++          continue;
++          (*check)->GetSourceL3address (src1);
++          tail->GetSourceL3address (src2);
++          (*check)->GetDestL3address (dst1);
++          tail->GetDestL3address (dst2);
++
++        }
++      Ptr<QueueDiscItem> item = *check;
++      SequenceNumber32 abc = (*check)->GetAckSeqHeader ();
++      std::cout << abc;
++
++/* Check TCP options and flags, don't drop ACKs with segment
++   * data, and don't drop ACKs with a higher cumulative ACK
++   * counter than the triggering packet. Check ACK seqno here to
++   * avoid parsing SACK options of packets we are going to exclude
++   * anyway.
++   */
++if (!AckFilterMayDrop ( *check,tstamp,tsecr) ||
++      (*check)->GetAckSeqHeader ()> tail->GetAckSeqHeader ())
++   continue;
++
++  /* Check SACK options. The triggering packet must SACK more data
++   * than the ACK under consideration, or SACK the same range but
++   * have a larger cumulative ACK counter. The latter is a
++   * pathological case, but is contained in the following check
++   * anyway, just to be safe.
++   */
++int sack_comp = AckFilterSackCompare(*check, tail);
++
++  if ((sack_comp < 0 ||
++      (*check)->GetAckSeqHeader () == tail->GetAckSeqHeader ()) &&
++       (sack_comp == 0))
++   continue;
++
++  /* At this point we have found an eligible pure ACK to drop; if
++   * we are in aggressive mode, we are done. Otherwise, keep
++   * searching unless this is the second eligible ACK we
++   * found.
++   *
++   * Since we want to drop ACK closest to the head of the queue,
++   * save the first eligible ACK we find, even if we need to loop
++   * again.
++   */
++  if (!elig_ack) {
++   elig_ack = *check;
++   elig_ack_prev = *prev;
++   uint8_t flag_check;
++      (*check)->GetUint8Value (QueueItem::TCP_FLAGS,flag_check);
++      elig_flags = (flag_check & (TcpHeader::ECE | TcpHeader::CWR));
++  }
++
++  if (num_found++ > 0)
++   goto found;
++ }
++
++ /* We made it through the queue without finding two eligible ACKs . If
++  * we found a single eligible ACK we can drop it in aggressive mode if
++  * we can guarantee that this does not interfere with ECN flag
++  * information. We ensure this by dropping it only if the enqueued
++  * packet is consecutive with the eligible ACK, and their flags match.
++  */
++  uint8_t flag_tail;
++      (tail)->GetUint8Value (QueueItem::TCP_FLAGS,flag_tail);
++      
++  if (elig_ack && (elig_flags == (flag_tail & (TcpHeader::ECE | TcpHeader::CWR))))
++     goto found;
++
++ //return NULL;
++
++found:
++ if (elig_ack_prev)
++  elig_ack_prev = elig_ack;
++ //else
++  //flow->head = elig_ack->next;
++
++
++ //skb_mark_not_on_list(elig_ack);
++
++ //return elig_ack;
++}
++
++}
+diff --git a/src/traffic-control/model/ack-filter.h b/src/traffic-control/model/ack-filter.h
+new file mode 100644
+index 000000000..58f900664
+--- /dev/null
++++ b/src/traffic-control/model/ack-filter.h
+@@ -0,0 +1,40 @@
++#include "ns3/object-factory.h"
++#include <list>
++#include <map>
++#include "ns3/pointer.h"
++#include "ns3/queue-disc.h"
++#include "queue-disc.h"
++
++namespace ns3 {
++
++class Ipv4QueueDiscItem;
++template <typename Item>
++class Queue;
++
++class AckFilter : public Object
++{
++public:
++  /**
++   * \brief Get the type ID.
++   * \return the object TypeId
++   */
++  static TypeId GetTypeId (void);
++
++public:
++  /**
++   * \brief Get the type ID.
++   * \return the object TypeId
++   */
++//  static TypeId GetTypeId (void);
++/**
++ * \brief AckFilter constructor
++ */
++  AckFilter ();
++
++  virtual ~AckFilter ();
++  virtual void AckFilterMain (Ptr<Queue<QueueDiscItem>> queue) const;
++  virtual bool AckFilterMayDrop (Ptr<QueueDiscItem> item, uint32_t tstamp,uint32_t tsecr) const;
++  virtual int AckFilterSackCompare (Ptr<QueueDiscItem> item_a, Ptr<QueueDiscItem> item_b) const;
++};
++
++}
+diff --git a/src/traffic-control/model/fifo-queue-disc.cc b/src/traffic-control/model/fifo-queue-disc.cc
+index a9d7be2c8..35c1914ba 100644
+--- a/src/traffic-control/model/fifo-queue-disc.cc
++++ b/src/traffic-control/model/fifo-queue-disc.cc
+@@ -22,6 +22,7 @@
+ #include "fifo-queue-disc.h"
+ #include "ns3/object-factory.h"
+ #include "ns3/drop-tail-queue.h"
++#include "ack-filter.h"
+ 
+ namespace ns3 {
+ 
+@@ -69,7 +70,9 @@ FifoQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
+     }
+ 
+   bool retval = GetInternalQueue (0)->Enqueue (item);
+-
++  Ptr<Queue<QueueDiscItem>> queue = GetInternalQueue (0);
++  AckFilter ack;
++  ack.AckFilterMain(queue);
+   // If Queue::Enqueue fails, QueueDisc::DropBeforeEnqueue is called by the
+   // internal queue because QueueDisc::AddInternalQueue sets the trace callback
+ 
+@@ -101,7 +104,7 @@ FifoQueueDisc::DoPeek (void)
+   NS_LOG_FUNCTION (this);
+ 
+   Ptr<const QueueDiscItem> item = GetInternalQueue (0)->Peek ();
+-
++  
+   if (!item)
+     {
+       NS_LOG_LOGIC ("Queue empty");
+diff --git a/src/traffic-control/wscript b/src/traffic-control/wscript
+index 5e0cc5caf..3218948a1 100644
+--- a/src/traffic-control/wscript
++++ b/src/traffic-control/wscript
+@@ -21,6 +21,7 @@ def build(bld):
+       'model/prio-queue-disc.cc',
+       'model/mq-queue-disc.cc',
+       'model/tbf-queue-disc.cc',
++      'model/ack-filter.cc',
+       'helper/traffic-control-helper.cc',
+       'helper/queue-disc-container.cc'
+         ]
+@@ -53,6 +54,7 @@ def build(bld):
+       'model/prio-queue-disc.h',
+       'model/mq-queue-disc.h',
+       'model/tbf-queue-disc.h',
++      'model/ack-filter.h',
+       'helper/traffic-control-helper.h',
+       'helper/queue-disc-container.h'
+         ]
