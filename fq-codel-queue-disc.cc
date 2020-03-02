@@ -172,7 +172,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
       uint32_t innerHash, outerHash;
       uint32_t flowHash;
       uint32_t set_ways = 8;
-
       if (GetNPacketFilters () == 0)
         {
           flowHash = item->Hash (m_perturbation);
@@ -182,9 +181,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
         }
       else
         {
-
           int32_t ret = Classify (item);
-
           if (ret != PacketFilter::PF_NO_MATCH)
             {
               flowHash = ret;
@@ -199,7 +196,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
               return false;
             }
         }
-
       Ptr<FqCoDelFlow> flow;
       if (m_flowsIndices.find (outerHash) == m_flowsIndices.end ())
         {
@@ -218,7 +214,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           m_newFlows.push_back (flow);
           tags[outerHash] = flowHash;
           flow->GetQueueDisc ()->Enqueue (item);
-
           if (GetCurrentSize () > GetMaxSize ())
             {
               FqCoDelDrop ();
@@ -231,7 +226,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
           for (i = m_flowsIndices[outerHash]; i < m_flowsIndices[outerHash] + 8; i++)
             {
               flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (i));
-
               if (tags[outerHash + i - m_flowsIndices[outerHash]] == flowHash ||
                   flow->GetStatus () == FqCoDelFlow::INACTIVE)
                 {
@@ -244,7 +238,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
                   flow->GetQueueDisc ()->Enqueue (item);
                   tags[outerHash + i - m_flowsIndices[outerHash]] = flowHash;
                   flag = true;
-
                   if (GetCurrentSize () > GetMaxSize ())
                     {
                       FqCoDelDrop ();
@@ -252,7 +245,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
                   break;
                 }
             }
-
           if (flag == false)
             {
               flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
@@ -265,9 +257,6 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
             }
         }
     } else {
-
-
-
   uint32_t h = 0;
 
   if (GetNPacketFilters () == 0)
@@ -321,9 +310,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
   if (GetCurrentSize () > GetMaxSize ())
     {
       FqCoDelDrop ();
-    }
-
-  
+    }  
 }
 return true;
 }
