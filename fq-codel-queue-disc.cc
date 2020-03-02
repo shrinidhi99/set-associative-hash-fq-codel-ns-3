@@ -130,9 +130,11 @@ TypeId FqCoDelQueueDisc::GetTypeId (void)
                    UintegerValue (0),
                    MakeUintegerAccessor (&FqCoDelQueueDisc::m_perturbation),
                    MakeUintegerChecker<uint32_t> ())
-     .AddAttribute (
-              "SetAssociativity", "Variable to use setassociativity hash", BooleanValue (false),
-              MakeBooleanAccessor (&FqCoDelQueueDisc::m_setAssociativity), MakeBooleanChecker ());
+     .AddAttribute ("SetAssociativeHash",
+                    "Enable/Disable Set Associative Hash",
+                    BooleanValue (false),
+                    MakeBooleanAccessor (&FqCoDelQueueDisc::m_setAssociativeHash),
+                    MakeBooleanChecker ());
   ;
   return tid;
 }
@@ -166,12 +168,14 @@ bool
 FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
   NS_LOG_FUNCTION (this << item);
-  if (m_setAssociativity)
+
+  if (m_setAssociativeHash)
     {
       uint32_t h = 0;
       uint32_t innerHash, outerHash;
       uint32_t flowHash;
       uint32_t set_ways = 8;
+
       if (GetNPacketFilters () == 0)
         {
           flowHash = item->Hash (m_perturbation);
@@ -196,6 +200,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
               return false;
             }
         }
+
       Ptr<FqCoDelFlow> flow;
       if (m_flowsIndices.find (outerHash) == m_flowsIndices.end ())
         {
@@ -245,7 +250,7 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
                   break;
                 }
             }
-          if (flag == false)
+          if (!flag)
             {
               flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
               flow->GetQueueDisc ()->Enqueue (item);
@@ -256,63 +261,65 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
                 }
             }
         }
-    } else {
-  uint32_t h = 0;
-
-  if (GetNPacketFilters () == 0)
-    {
-      h = item->Hash (m_perturbation) % m_flows;
     }
   else
     {
-      int32_t ret = Classify (item);
+      uint32_t h = 0;
 
-      if (ret != PacketFilter::PF_NO_MATCH)
+      if (GetNPacketFilters () == 0)
         {
-          h = ret % m_flows;
+          h = item->Hash (m_perturbation) % m_flows;
         }
       else
         {
-          NS_LOG_ERROR ("No filter has been able to classify this packet, drop it.");
-          DropBeforeEnqueue (item, UNCLASSIFIED_DROP);
-          return false;
+          int32_t ret = Classify (item);
+
+          if (ret != PacketFilter::PF_NO_MATCH)
+            {
+              h = ret % m_flows;
+            }
+          else
+            {
+              NS_LOG_ERROR ("No filter has been able to classify this packet, drop it.");
+              DropBeforeEnqueue (item, UNCLASSIFIED_DROP);
+              return false;
+            }
+        }
+
+      Ptr<FqCoDelFlow> flow;
+      if (m_flowsIndices.find (h) == m_flowsIndices.end ())
+        {
+          NS_LOG_DEBUG ("Creating a new flow queue with index " << h);
+          flow = m_flowFactory.Create<FqCoDelFlow> ();
+          Ptr<QueueDisc> qd = m_queueDiscFactory.Create<QueueDisc> ();
+          qd->Initialize ();
+          flow->SetQueueDisc (qd);
+          AddQueueDiscClass (flow);
+
+          m_flowsIndices[h] = GetNQueueDiscClasses () - 1;
+        }
+      else
+        {
+          flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[h]));
+        }
+
+      if (flow->GetStatus () == FqCoDelFlow::INACTIVE)
+        {
+          flow->SetStatus (FqCoDelFlow::NEW_FLOW);
+          flow->SetDeficit (m_quantum);
+          m_newFlows.push_back (flow);
+        }
+
+      flow->GetQueueDisc ()->Enqueue (item);
+
+      NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index " << m_flowsIndices[h]);
+
+      if (GetCurrentSize () > GetMaxSize ())
+        {
+          FqCoDelDrop ();
         }
     }
-
-  Ptr<FqCoDelFlow> flow;
-  if (m_flowsIndices.find (h) == m_flowsIndices.end ())
-    {
-      NS_LOG_DEBUG ("Creating a new flow queue with index " << h);
-      flow = m_flowFactory.Create<FqCoDelFlow> ();
-      Ptr<QueueDisc> qd = m_queueDiscFactory.Create<QueueDisc> ();
-      qd->Initialize ();
-      flow->SetQueueDisc (qd);
-      AddQueueDiscClass (flow);
-
-      m_flowsIndices[h] = GetNQueueDiscClasses () - 1;
-    }
-  else
-    {
-      flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[h]));
-    }
-
-  if (flow->GetStatus () == FqCoDelFlow::INACTIVE)
-    {
-      flow->SetStatus (FqCoDelFlow::NEW_FLOW);
-      flow->SetDeficit (m_quantum);
-      m_newFlows.push_back (flow);
-    }
-
-  flow->GetQueueDisc ()->Enqueue (item);
-
-  NS_LOG_DEBUG ("Packet enqueued into flow " << h << "; flow index " << m_flowsIndices[h]);
-
-  if (GetCurrentSize () > GetMaxSize ())
-    {
-      FqCoDelDrop ();
-    }  
-}
-return true;
+  return true;
 }
 
 Ptr<QueueDiscItem>

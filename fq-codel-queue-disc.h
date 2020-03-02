@@ -148,7 +148,7 @@ private:
   uint32_t m_flows;          //!< Number of flow queues
   uint32_t m_dropBatchSize;  //!< Max number of packets dropped from the fat flow
   uint32_t m_perturbation;   //!< hash perturbation value
-  bool m_setAssociativity;     //!< To enable set-associative hashing
+  bool m_setAssociativeHash; //!< To enable Set Associative Hash
 
   std::list<Ptr<FqCoDelFlow> > m_newFlows;    //!< The list of new flows
   std::list<Ptr<FqCoDelFlow> > m_oldFlows;    //!< The list of old flows
