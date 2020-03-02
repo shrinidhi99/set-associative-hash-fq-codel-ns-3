@@ -35,7 +35,10 @@
 #include "ns3/pointer.h"
 
 using namespace ns3;
+
+// TODO: Add a brief description
 int32_t hash;
+
 /**
  * Simple test packet filter able to classify IPv4 packets
  *
@@ -116,6 +119,7 @@ FqCoDelQueueDiscNoSuitableFilter::DoRun (void)
   Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("MaxSize", StringValue ("4p"));
   Ptr<Ipv4TestPacketFilter> filter = CreateObject<Ipv4TestPacketFilter> ();
   queueDisc->AddPacketFilter (filter);
+
   hash = -1;
   queueDisc->SetQuantum (1500);
   queueDisc->Initialize ();
@@ -521,16 +525,25 @@ FqCoDelQueueDiscUDPFlowsSeparation::DoRun (void)
 }
 
 /**
- * This class tests Linear probing capability, collision response, and set creation capability of SetAssociative Hashing in fqCodel
- * SetAssociative hash.We modified DoClassify and CheckProtocol so that we could control the hash returned for each packet
- * We use flow hashes ranging from 0 to 7. These must go into different queues in the same set. The set number is obtained by m_flowsIndices[0] which is 0.
- * When a new packet comes in with flow 1024. Since 1024 % 1024 = 0, m_flowsIndices[0] = 0 is obtained, and the first set is iteratively searched. 
- * The packet is added to queue 0 since the tag of the queues in the set don't match with the hash of the flow and the tag of the queue is updated.
- * A packet with hash 1025 arrives. Since 1025 % 1024 = 1, m_flowsIndices[0] = 0 is obtained, and the first set is iteratively searched. There is no match. Therefore
- * it is added to  queue 0 and the tag is updated.
- * When a flow hash of 20 arrives, the outerHash corresponding to 20 is 16, and m_flowIndices[16] wasn’t previously allotted, a new set of eight queues are created, 
- * and m_flowsIndices[16] is set to be 8 (since there are queues 0-7 previously set). After creating eight queues 8-15, 
- * insert the packet into the first queue in this set.
+ * This class tests linear probing capability, collision response, and set
+ * creation capability of SetAssociative hashing in fqCodel SetAssociative
+ * hash. We modified DoClassify and CheckProtocol so that we could control
+ * the hash returned for each packet. We use flow hashes ranging from 0 to 7.
+ * These must go into different queues in the same set. The set number is
+ * obtained by m_flowsIndices[0] which is 0. When a new packet comes in with
+ * flow 1024, m_flowsIndices[0] = 0 is obtained because 1024 % 1024 = 0, and
+ * the first set is iteratively searched. The packet is added to queue 0 since
+ * the tag of the queues in the set don't match with the hash of the flow, and
+ * the tag of the queue is updated. When a packet with hash 1025 arrives, 
+ * m_flowsIndices[0] = 0 is obtained because 1025 % 1024 = 1, and the first set
+ * is iteratively searched. Since there is no match, it is added to queue 0 and
+ * the tag is updated.
+ *
+ * When a flow hash of 20 arrives, the outerHash corresponding to 20 is 16, and
+ * m_flowIndices[16] wasn’t previously allotted, a new set of eight queues are
+ * created, and m_flowsIndices[16] is set to be 8 (since there are queues 0-7
+ * previously set). After creating eight queues 8-15, insert the packet into the
+ * first queue in this set.
  */
 class FqCoDelQueueDiscSetLinearProbing : public TestCase
 {
@@ -560,21 +573,22 @@ FqCoDelQueueDiscSetLinearProbing::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4He
   queue->Enqueue (item);
 }
 
-
-
 void
 FqCoDelQueueDiscSetLinearProbing::DoRun (void)
 {
   Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("SetAssociativity", BooleanValue (true));
   queueDisc->SetQuantum (90);
   queueDisc->Initialize ();
+
   Ptr<Ipv4TestPacketFilter> filter = CreateObject<Ipv4TestPacketFilter> ();
   queueDisc->AddPacketFilter (filter);
+
   Ipv4Header hdr;
   hdr.SetPayloadSize (100);
   hdr.SetSource (Ipv4Address ("10.10.1.1"));
   hdr.SetDestination (Ipv4Address ("10.10.1.2"));
   hdr.SetProtocol (7);
+
   hash = 0;
   AddPacket (queueDisc, hdr);
   hash = 1;
@@ -596,6 +610,7 @@ FqCoDelQueueDiscSetLinearProbing::DoRun (void)
   AddPacket (queueDisc, hdr);
   hash = 1024;
   AddPacket (queueDisc, hdr);
+
   NS_TEST_ASSERT_MSG_EQ (queueDisc->QueueDisc::GetNPackets (), 11,
                          "unexpected number of packets in the queue disc");
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (0)->GetQueueDisc ()->GetNPackets (), 2,
@@ -613,7 +628,7 @@ FqCoDelQueueDiscSetLinearProbing::DoRun (void)
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (6)->GetQueueDisc ()->GetNPackets (), 1,
                          "unexpected number of packets in the seventh flow queue of set one");
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (7)->GetQueueDisc ()->GetNPackets (), 1,
-                         "unexpected number of packets in the eigth flow queue of set one");
+                         "unexpected number of packets in the eighth flow queue of set one");
   hash = 1025;
   AddPacket (queueDisc, hdr);
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (0)->GetQueueDisc ()->GetNPackets (), 3,
@@ -660,28 +675,34 @@ FqCoDelQueueDiscCollision::DoRun (void)
   Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("SetAssociativity", BooleanValue (false));
   queueDisc->SetQuantum (90);
   queueDisc->Initialize ();
+
   Ptr<Ipv4TestPacketFilter> filter = CreateObject<Ipv4TestPacketFilter> ();
   queueDisc->AddPacketFilter (filter);
+
   Ipv4Header hdr;
   hdr.SetPayloadSize (100);
   hdr.SetSource (Ipv4Address ("10.10.1.1"));
   hdr.SetDestination (Ipv4Address ("10.10.1.2"));
   hdr.SetProtocol (7);
+
   int i = 0;
-  std::ifstream in("hv_9.txt");
-    if(!in) {
+  std::ifstream in ("hv_9.txt");
+  if (!in)
+    {
       std::cout << "Cannot open input file.\n";
     }
-  while(1){
-    char str[255];
-    in.getline(str, 255);
-    unsigned int ui = static_cast<unsigned int>(std::stoul(std::string{str}));
-    hash = ui;
-    if(i >= 4000){
-    	AddPacket (queueDisc, hdr);
+  while (1)
+    {
+      char str[255];
+      in.getline (str, 255);
+      unsigned int ui = static_cast<unsigned int>(std::stoul(std::string{str}));
+      hash = ui;
+      if (i >= 4000)
+        {
+    	    AddPacket (queueDisc, hdr);
+        }
+      i++;
     }
-    i++;
-  }
   in.close();
   Simulator::Destroy ();
 }
@@ -701,7 +722,6 @@ FqCoDelQueueDiscTestSuite::FqCoDelQueueDiscTestSuite ()
   AddTestCase (new FqCoDelQueueDiscTCPFlowsSeparation, TestCase::QUICK);
   AddTestCase (new FqCoDelQueueDiscUDPFlowsSeparation, TestCase::QUICK);
   AddTestCase (new FqCoDelQueueDiscSetLinearProbing, TestCase::QUICK);
-  // AddTestCase (new FqCoDelQueueDiscCollision, TestCase::QUICK);
 }
 
 static FqCoDelQueueDiscTestSuite fqCoDelQueueDiscTestSuite;
