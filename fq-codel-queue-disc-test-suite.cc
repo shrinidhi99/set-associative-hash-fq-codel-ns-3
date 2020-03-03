@@ -577,7 +577,7 @@ FqCoDelQueueDiscSetLinearProbing::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4He
 void
 FqCoDelQueueDiscSetLinearProbing::DoRun (void)
 {
-  Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("SetAssociativity", BooleanValue (true));
+  Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("SetAssociativeHash", BooleanValue (true));
   queueDisc->SetQuantum (90);
   queueDisc->Initialize ();
 
