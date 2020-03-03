@@ -36,7 +36,7 @@
 
 using namespace ns3;
 
-// TODO: Add a brief description
+// Variable to dynamically and manually assign hash to a new packet's flow
 int32_t hash;
 
 /**
@@ -526,20 +526,21 @@ FqCoDelQueueDiscUDPFlowsSeparation::DoRun (void)
 
 /**
  * This class tests linear probing capability, collision response, and set
- * creation capability of SetAssociative hashing in fqCodel SetAssociative
+ * creation capability of SetAssociative hashing in FqCodel SetAssociative
  * hash. We modified DoClassify and CheckProtocol so that we could control
- * the hash returned for each packet. We use flow hashes ranging from 0 to 7.
+ * the hash returned for each packet. In the beginning, we use flow hashes ranging from 0 to 7.
  * These must go into different queues in the same set. The set number is
  * obtained by m_flowsIndices[0] which is 0. When a new packet comes in with
- * flow 1024, m_flowsIndices[0] = 0 is obtained because 1024 % 1024 = 0, and
+ * flow hash 1024, because 1024 % 1024 = 0, m_flowsIndices[0] = 0 is obtained and
  * the first set is iteratively searched. The packet is added to queue 0 since
- * the tag of the queues in the set don't match with the hash of the flow, and
+ * the tag of the queues in the set doesn't match with the hash of the flow, and
  * the tag of the queue is updated. When a packet with hash 1025 arrives, 
- * m_flowsIndices[0] = 0 is obtained because 1025 % 1024 = 1, and the first set
+ * m_flowsIndices[0] = 0 is obtained (because 1025 % 1024 = 1) and the first set
  * is iteratively searched. Since there is no match, it is added to queue 0 and
  * the tag is updated.
  *
- * When a flow hash of 20 arrives, the outerHash corresponding to 20 is 16, and
+ * The variable outerHash stores the nearest multiple of 8 that is lesser than the hash. 
+ * When a flow hash of 20 arrives, the outerHash corresponding to 20 is 16, and since
  * m_flowIndices[16] wasn’t previously allotted, a new set of eight queues are
  * created, and m_flowsIndices[16] is set to be 8 (since there are queues 0-7
  * previously set). After creating eight queues 8-15, insert the packet into the
@@ -637,73 +638,6 @@ FqCoDelQueueDiscSetLinearProbing::DoRun (void)
   AddPacket (queueDisc, hdr);
   NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (8)->GetQueueDisc ()->GetNPackets (), 1,
                          "unexpected number of packets in the first flow of set two");
-  Simulator::Destroy ();
-}
-
-class FqCoDelQueueDiscCollision : public TestCase
-{
-public:
-  FqCoDelQueueDiscCollision ();
-  virtual ~FqCoDelQueueDiscCollision ();
-
-private:
-  virtual void DoRun (void);
-  void AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr);
-};
-
-FqCoDelQueueDiscCollision::FqCoDelQueueDiscCollision ()
-    : TestCase ("Test credits and flows status")
-{
-}
-
-FqCoDelQueueDiscCollision::~FqCoDelQueueDiscCollision ()
-{
-}
-
-void
-FqCoDelQueueDiscCollision::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr)
-{
-  Ptr<Packet> p = Create<Packet> (100);
-  Address dest;
-  Ptr<Ipv4QueueDiscItem> item = Create<Ipv4QueueDiscItem> (p, dest, 0, hdr);
-  queue->Enqueue (item);
-}
-
-void
-FqCoDelQueueDiscCollision::DoRun (void)
-{
-  Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("SetAssociativity", BooleanValue (false));
-  queueDisc->SetQuantum (90);
-  queueDisc->Initialize ();
-
-  Ptr<Ipv4TestPacketFilter> filter = CreateObject<Ipv4TestPacketFilter> ();
-  queueDisc->AddPacketFilter (filter);
-
-  Ipv4Header hdr;
-  hdr.SetPayloadSize (100);
-  hdr.SetSource (Ipv4Address ("10.10.1.1"));
-  hdr.SetDestination (Ipv4Address ("10.10.1.2"));
-  hdr.SetProtocol (7);
-
-  int i = 0;
-  std::ifstream in ("hv_9.txt");
-  if (!in)
-    {
-      std::cout << "Cannot open input file.\n";
-    }
-  while (1)
-    {
-      char str[255];
-      in.getline (str, 255);
-      unsigned int ui = static_cast<unsigned int>(std::stoul(std::string{str}));
-      hash = ui;
-      if (i >= 4000)
-        {
-    	    AddPacket (queueDisc, hdr);
-        }
-      i++;
-    }
-  in.close();
   Simulator::Destroy ();
 }
 
