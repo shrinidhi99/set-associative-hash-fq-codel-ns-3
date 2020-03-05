@@ -25,7 +25,7 @@ queues, set-associative hash has fewer collisions in comparison to traditional
 hash as long as the number of flows is fewer than the number of queues. 
 Essentially, it makes the queue management system more efficient. Set associative hash is a vital component of CAKE, which is another popular flow management algorithm that 
 is also implemented in Linux and is being tested for FqCodel. Furthermore, 
-this module can be directly used with CAKE when its other components are implementeded in ns-3. 
+this module can be directly used with CAKE when its other components are implemented in ns-3. 
 The only changes are in the DoEnqueue function and are detailed below.
 
 * class :cpp:class:`FqCoDelQueueDisc`: This class implements the main FqCoDel algorithm:
@@ -89,7 +89,7 @@ A typical usage pattern is to create a traffic control helper and to configure t
 
 Application of Set Associative Hash
 ========
-Set Associative Hash is best used when the number of flows is fewer than the number of queues. As quoted in the FqCodel RFC “based on analytical equations for hash collision probabilities, for 100 flows, the probability of no collision is 90.78%...For a 4-way associative hash with the same number of total queues, the probability of no collisions for 100 flows is 99.93%, while for an 8-way associative hash, it is ~100%.” Furthermore, this module can be used when CAKE is being implementeded in ns-3. 
+Set Associative Hash is best used when the number of flows is fewer than the number of queues. As quoted in the FqCodel RFC “based on analytical equations for hash collision probabilities, for 100 flows, the probability of no collision is 90.78%...For a 4-way associative hash with the same number of total queues, the probability of no collisions for 100 flows is 99.93%, while for an 8-way associative hash, it is ~100%.” Furthermore, this module can be used when CAKE is being implemented in ns-3. 
 
 
 
