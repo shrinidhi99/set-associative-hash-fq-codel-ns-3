@@ -36,7 +36,7 @@
 
 using namespace ns3;
 
-// Variable to dynamically and manually assign hash to a new packet's flow
+// Variable to assign hash to a new packet's flow
 int32_t hash;
 
 /**
@@ -524,28 +524,30 @@ FqCoDelQueueDiscUDPFlowsSeparation::DoRun (void)
   Simulator::Destroy ();
 }
 
-/**
+/*
  * This class tests linear probing capability, collision response, and set
  * creation capability of SetAssociative hashing in FqCodel SetAssociative
  * hash. We modified DoClassify and CheckProtocol so that we could control
- * the hash returned for each packet. In the beginning, we use flow hashes ranging from 0 to 7.
- * These must go into different queues in the same set. The set number is
- * obtained by m_flowsIndices[0] which is 0. When a new packet comes in with
- * flow hash 1024, because 1024 % 1024 = 0, m_flowsIndices[0] = 0 is obtained and
- * the first set is iteratively searched. The packet is added to queue 0 since
- * the tag of the queues in the set doesn't match with the hash of the flow, and
- * the tag of the queue is updated. When a packet with hash 1025 arrives, 
- * m_flowsIndices[0] = 0 is obtained (because 1025 % 1024 = 1) and the first set
- * is iteratively searched. Since there is no match, it is added to queue 0 and
- * the tag is updated.
+ * the hash returned for each packet. In the beginning, we use flow hashes
+ * ranging from 0 to 7. These must go into different queues in the same set. 
+ * The set number is obtained by m_flowsIndices[0] which is 0. When a new 
+ * packet comes in with flow hash 1024, because 1024 % 1024 = 0, 
+ * m_flowsIndices[0] = 0 is obtained and the first set is iteratively searched.
+ * The packet is added to queue 0 since the tag of the queues in the set 
+ * doesn't match with the hash of the flow, and the tag of the queue is 
+ * updated. When a packet with hash 1025 arrives, m_flowsIndices[0] = 0
+ * is obtained (because 1025 % 1024 = 1) and the first set is iteratively
+ * searched. Since there is no match, it is added to queue 0 and the tag is
+ * updated.
  *
- * The variable outerHash stores the nearest multiple of 8 that is lesser than the hash. 
- * When a flow hash of 20 arrives, the outerHash corresponding to 20 is 16, and since
- * m_flowIndices[16] wasn’t previously allotted, a new set of eight queues are
- * created, and m_flowsIndices[16] is set to be 8 (since there are queues 0-7
- * previously set). After creating eight queues 8-15, insert the packet into the
- * first queue in this set.
- */
+ * The variable outerHash stores the nearest multiple of 8 that is lesser than
+ * the hash. When a flow hash of 20 arrives, the outerHash corresponding to 20
+ * is 16, and since m_flowIndices[16] wasn’t previously allotted, a new set of
+ * eight queues are created, and m_flowsIndices[16] is set to be 8 (since there
+ * are queues 0-7 previously set). After creating eight queues 8-15, insert the
+ * packet into the first queue in this set.
+*/
+
 class FqCoDelQueueDiscSetLinearProbing : public TestCase
 {
 public:
