@@ -1,0 +1,151 @@
+From f56fea27c4218681429a89152779899e091292ff Mon Sep 17 00:00:00 2001
+From: Ab261 <avakash261@gmail.com>
+Date: Fri, 6 Mar 2020 08:20:08 +0530
+Subject: [PATCH 1/3] traffic-control: Add Set Associative Hash Option
+
+---
+ .../model/fq-codel-queue-disc.cc              | 101 ++++++++++++++++++
+ .../model/fq-codel-queue-disc.h               |   1 +
+ 2 files changed, 102 insertions(+)
+
+diff --git a/src/traffic-control/model/fq-codel-queue-disc.cc b/src/traffic-control/model/fq-codel-queue-disc.cc
+index 3ea41b050..46e717cc7 100644
+--- a/src/traffic-control/model/fq-codel-queue-disc.cc
++++ b/src/traffic-control/model/fq-codel-queue-disc.cc
+@@ -29,6 +29,7 @@
+ namespace ns3 {
+ 
+ NS_LOG_COMPONENT_DEFINE ("FqCoDelQueueDisc");
++uint32_t tags[1024];
+ 
+ NS_OBJECT_ENSURE_REGISTERED (FqCoDelFlow);
+ 
+@@ -129,6 +130,11 @@ TypeId FqCoDelQueueDisc::GetTypeId (void)
+                    UintegerValue (0),
+                    MakeUintegerAccessor (&FqCoDelQueueDisc::m_perturbation),
+                    MakeUintegerChecker<uint32_t> ())
++     .AddAttribute ("SetAssociativeHash",
++                    "Enable/Disable Set Associative Hash",
++                    BooleanValue (false),
++                    MakeBooleanAccessor (&FqCoDelQueueDisc::m_setAssociativeHash),
++                    MakeBooleanChecker ());
+   ;
+   return tid;
+ }
+@@ -163,6 +169,101 @@ FqCoDelQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
+ {
+   NS_LOG_FUNCTION (this << item);
+ 
++  if (m_setAssociativeHash)
++    {
++      uint32_t h = 0;
++      uint32_t innerHash, outerHash;
++      uint32_t flowHash;
++      uint32_t set_ways = 8;
++
++      if (GetNPacketFilters () == 0)
++        {
++          flowHash = item->Hash (m_perturbation);
++          h = (flowHash % m_flows);
++          innerHash = h % set_ways;
++          outerHash = h - innerHash;
++        }
++      else
++        {
++          int32_t ret = Classify (item);
++          if (ret != PacketFilter::PF_NO_MATCH)
++            {
++              flowHash = ret;
++              h = ret % m_flows;
++              innerHash = h % set_ways;
++              outerHash = h - innerHash;
++            }
++          else
++            {
++              NS_LOG_ERROR ("No filter has been able to classify this packet, drop it.");
++              DropBeforeEnqueue (item, UNCLASSIFIED_DROP);
++              return false;
++            }
++        }
++
++      Ptr<FqCoDelFlow> flow;
++      if (m_flowsIndices.find (outerHash) == m_flowsIndices.end ())
++        {
++          for (uint32_t i = 0; i < 8; i++)
++            {
++              flow = m_flowFactory.Create<FqCoDelFlow> ();
++              Ptr<QueueDisc> qd = m_queueDiscFactory.Create<QueueDisc> ();
++              qd->Initialize ();
++              flow->SetQueueDisc (qd);
++              AddQueueDiscClass (flow);
++            }
++          m_flowsIndices[outerHash] = GetNQueueDiscClasses () - 8;
++          flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
++          flow->SetStatus (FqCoDelFlow::NEW_FLOW);
++          flow->SetDeficit (m_quantum);
++          m_newFlows.push_back (flow);
++          tags[outerHash] = flowHash;
++          flow->GetQueueDisc ()->Enqueue (item);
++          if (GetCurrentSize () > GetMaxSize ())
++            {
++              FqCoDelDrop ();
++            }
++        }
++      else
++        {
++          uint32_t i;
++          bool flag = false;
++          for (i = m_flowsIndices[outerHash]; i < m_flowsIndices[outerHash] + 8; i++)
++            {
++              flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (i));
++              if (tags[outerHash + i - m_flowsIndices[outerHash]] == flowHash ||
++                  flow->GetStatus () == FqCoDelFlow::INACTIVE)
++                {
++                  if (flow->GetStatus () == FqCoDelFlow::INACTIVE)
++                    {
++                      flow->SetStatus (FqCoDelFlow::NEW_FLOW);
++                      flow->SetDeficit (m_quantum);
++                      m_newFlows.push_back (flow);
++                    }
++                  flow->GetQueueDisc ()->Enqueue (item);
++                  tags[outerHash + i - m_flowsIndices[outerHash]] = flowHash;
++                  flag = true;
++                  if (GetCurrentSize () > GetMaxSize ())
++                    {
++                      FqCoDelDrop ();
++                    }
++                  break;
++                }
++            }
++          if (!flag)
++            {
++              flow = StaticCast<FqCoDelFlow> (GetQueueDiscClass (m_flowsIndices[outerHash]));
++              flow->GetQueueDisc ()->Enqueue (item);
++              tags[outerHash] = flowHash;
++              if (GetCurrentSize () > GetMaxSize ())
++                {
++                  FqCoDelDrop ();
++                }
++            }
++        }
++    }
++  else
++    {
+   uint32_t h = 0;
+ 
+   if (GetNPacketFilters () == 0)
+diff --git a/src/traffic-control/model/fq-codel-queue-disc.h b/src/traffic-control/model/fq-codel-queue-disc.h
+index 0d7390f64..e531b8f0f 100644
+--- a/src/traffic-control/model/fq-codel-queue-disc.h
++++ b/src/traffic-control/model/fq-codel-queue-disc.h
+@@ -148,6 +148,7 @@ private:
+   uint32_t m_flows;          //!< Number of flow queues
+   uint32_t m_dropBatchSize;  //!< Max number of packets dropped from the fat flow
+   uint32_t m_perturbation;   //!< hash perturbation value
++  bool m_setAssociativeHash; //!< To enable Set Associative Hash
+ 
+   std::list<Ptr<FqCoDelFlow> > m_newFlows;    //!< The list of new flows
+   std::list<Ptr<FqCoDelFlow> > m_oldFlows;    //!< The list of old flows
+-- 
+2.17.1
+

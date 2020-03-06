@@ -1,0 +1,191 @@
+From f1561286c7d55bf5ba22d80e667f0c8572de1692 Mon Sep 17 00:00:00 2001
+From: Ab261 <avakash261@gmail.com>
+Date: Fri, 6 Mar 2020 08:21:28 +0530
+Subject: [PATCH 2/3] ns3tc: Add test suite for Set Associative Hash
+
+---
+ .../ns3tc/fq-codel-queue-disc-test-suite.cc   | 133 +++++++++++++++++-
+ 1 file changed, 132 insertions(+), 1 deletion(-)
+
+diff --git a/src/test/ns3tc/fq-codel-queue-disc-test-suite.cc b/src/test/ns3tc/fq-codel-queue-disc-test-suite.cc
+index ad76568b7..40a416671 100644
+--- a/src/test/ns3tc/fq-codel-queue-disc-test-suite.cc
++++ b/src/test/ns3tc/fq-codel-queue-disc-test-suite.cc
+@@ -36,6 +36,9 @@
+ 
+ using namespace ns3;
+ 
++// Variable to assign hash to a new packet's flow
++int32_t hash;
++
+ /**
+  * Simple test packet filter able to classify IPv4 packets
+  *
+@@ -53,6 +56,7 @@ public:
+ 
+ private:
+   virtual int32_t DoClassify (Ptr<QueueDiscItem> item) const;
++  virtual bool CheckProtocol (Ptr<QueueDiscItem> item) const;
+ };
+ 
+ TypeId
+@@ -77,7 +81,13 @@ Ipv4TestPacketFilter::~Ipv4TestPacketFilter ()
+ int32_t
+ Ipv4TestPacketFilter::DoClassify (Ptr<QueueDiscItem> item) const
+ {
+-  return 0;
++  return hash;
++}
++
++bool
++Ipv4TestPacketFilter::CheckProtocol (Ptr<QueueDiscItem> item) const
++{
++  return true;
+ }
+ 
+ /**
+@@ -110,6 +120,7 @@ FqCoDelQueueDiscNoSuitableFilter::DoRun (void)
+   Ptr<Ipv4TestPacketFilter> filter = CreateObject<Ipv4TestPacketFilter> ();
+   queueDisc->AddPacketFilter (filter);
+ 
++  hash = -1;
+   queueDisc->SetQuantum (1500);
+   queueDisc->Initialize ();
+ 
+@@ -513,6 +524,125 @@ FqCoDelQueueDiscUDPFlowsSeparation::DoRun (void)
+   Simulator::Destroy ();
+ }
+ 
++/*
++ * This class tests linear probing capability, collision response, and set
++ * creation capability of SetAssociative hashing in FqCodel SetAssociative
++ * hash. We modified DoClassify and CheckProtocol so that we could control
++ * the hash returned for each packet. In the beginning, we use flow hashes
++ * ranging from 0 to 7. These must go into different queues in the same set. 
++ * The set number is obtained by m_flowsIndices[0] which is 0. When a new 
++ * packet comes in with flow hash 1024, because 1024 % 1024 = 0, 
++ * m_flowsIndices[0] = 0 is obtained and the first set is iteratively searched.
++ * The packet is added to queue 0 since the tag of the queues in the set 
++ * doesn't match with the hash of the flow, and the tag of the queue is 
++ * updated. When a packet with hash 1025 arrives, m_flowsIndices[0] = 0
++ * is obtained (because 1025 % 1024 = 1) and the first set is iteratively
++ * searched. Since there is no match, it is added to queue 0 and the tag is
++ * updated.
++ *
++ * The variable outerHash stores the nearest multiple of 8 that is lesser than
++ * the hash. When a flow hash of 20 arrives, the outerHash corresponding to 20
++ * is 16, and since m_flowIndices[16] wasn’t previously allotted, a new set of
++ * eight queues are created, and m_flowsIndices[16] is set to be 8 (since there
++ * are queues 0-7 previously set). After creating eight queues 8-15, insert the
++ * packet into the first queue in this set.
++*/
++
++class FqCoDelQueueDiscSetLinearProbing : public TestCase
++{
++public:
++  FqCoDelQueueDiscSetLinearProbing ();
++  virtual ~FqCoDelQueueDiscSetLinearProbing ();
++private:
++  virtual void DoRun (void);
++  void AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr);
++};
++
++FqCoDelQueueDiscSetLinearProbing::FqCoDelQueueDiscSetLinearProbing ()
++    : TestCase ("Test credits and flows status")
++{
++}
++
++FqCoDelQueueDiscSetLinearProbing::~FqCoDelQueueDiscSetLinearProbing ()
++{
++}
++
++void
++FqCoDelQueueDiscSetLinearProbing::AddPacket (Ptr<FqCoDelQueueDisc> queue, Ipv4Header hdr)
++{
++  Ptr<Packet> p = Create<Packet> (100);
++  Address dest;
++  Ptr<Ipv4QueueDiscItem> item = Create<Ipv4QueueDiscItem> (p, dest, 0, hdr);
++  queue->Enqueue (item);
++}
++
++void
++FqCoDelQueueDiscSetLinearProbing::DoRun (void)
++{
++  Ptr<FqCoDelQueueDisc> queueDisc = CreateObjectWithAttributes<FqCoDelQueueDisc> ("SetAssociativeHash", BooleanValue (true));
++  queueDisc->SetQuantum (90);
++  queueDisc->Initialize ();
++
++  Ptr<Ipv4TestPacketFilter> filter = CreateObject<Ipv4TestPacketFilter> ();
++  queueDisc->AddPacketFilter (filter);
++
++  Ipv4Header hdr;
++  hdr.SetPayloadSize (100);
++  hdr.SetSource (Ipv4Address ("10.10.1.1"));
++  hdr.SetDestination (Ipv4Address ("10.10.1.2"));
++  hdr.SetProtocol (7);
++
++  hash = 0;
++  AddPacket (queueDisc, hdr);
++  hash = 1;
++  AddPacket (queueDisc, hdr);
++  AddPacket (queueDisc, hdr);
++  hash = 2;
++  AddPacket (queueDisc, hdr);
++  hash = 3;
++  AddPacket (queueDisc, hdr);
++  hash = 4;
++  AddPacket (queueDisc, hdr);
++  hash = 4;
++  AddPacket (queueDisc, hdr);
++  hash = 5;
++  AddPacket (queueDisc, hdr);
++  hash = 6;
++  AddPacket (queueDisc, hdr);
++  hash = 7;
++  AddPacket (queueDisc, hdr);
++  hash = 1024;
++  AddPacket (queueDisc, hdr);
++
++  NS_TEST_ASSERT_MSG_EQ (queueDisc->QueueDisc::GetNPackets (), 11,
++                         "unexpected number of packets in the queue disc");
++  NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (0)->GetQueueDisc ()->GetNPackets (), 2,
++                         "unexpected number of packets in the first flow queue of set one");
++  NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (1)->GetQueueDisc ()->GetNPackets (), 2,
++                         "unexpected number of packets in the second flow queue of set one");
++  NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (2)->GetQueueDisc ()->GetNPackets (), 1,
++                         "unexpected number of packets in the third flow queue of set one");
++  NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (3)->GetQueueDisc ()->GetNPackets (), 1,
++                         "unexpected number of packets in the fourth flow queue of set one");
++  NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (4)->GetQueueDisc ()->GetNPackets (), 2,
++                         "unexpected number of packets in the fifth flow queue of set one");
++  NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (5)->GetQueueDisc ()->GetNPackets (), 1,
++                         "unexpected number of packets in the sixth flow queue of set one");
++  NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (6)->GetQueueDisc ()->GetNPackets (), 1,
++                         "unexpected number of packets in the seventh flow queue of set one");
++  NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (7)->GetQueueDisc ()->GetNPackets (), 1,
++                         "unexpected number of packets in the eighth flow queue of set one");
++  hash = 1025;
++  AddPacket (queueDisc, hdr);
++  NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (0)->GetQueueDisc ()->GetNPackets (), 3,
++                         "unexpected number of packets in the first flow of set one");
++  hash = 10;
++  AddPacket (queueDisc, hdr);
++  NS_TEST_ASSERT_MSG_EQ (queueDisc->GetQueueDiscClass (8)->GetQueueDisc ()->GetNPackets (), 1,
++                         "unexpected number of packets in the first flow of set two");
++  Simulator::Destroy ();
++}
++
+ class FqCoDelQueueDiscTestSuite : public TestSuite
+ {
+ public:
+@@ -527,6 +657,7 @@ FqCoDelQueueDiscTestSuite::FqCoDelQueueDiscTestSuite ()
+   AddTestCase (new FqCoDelQueueDiscDeficit, TestCase::QUICK);
+   AddTestCase (new FqCoDelQueueDiscTCPFlowsSeparation, TestCase::QUICK);
+   AddTestCase (new FqCoDelQueueDiscUDPFlowsSeparation, TestCase::QUICK);
++  AddTestCase (new FqCoDelQueueDiscSetLinearProbing, TestCase::QUICK);
+ }
+ 
+ static FqCoDelQueueDiscTestSuite fqCoDelQueueDiscTestSuite;
+-- 
+2.17.1
+
