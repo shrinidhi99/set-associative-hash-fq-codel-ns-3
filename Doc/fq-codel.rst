@@ -138,6 +138,7 @@ The SetAssociative Hash is tested by generating a probability collision graph. T
   :alt: Generated Collision Probability Graph
   
 The overlapped graph is also linked below
+
   .. image:: figures/overlapped.jpeg
   :alt: Overlapped Image with the graph from CAKE paper
   
